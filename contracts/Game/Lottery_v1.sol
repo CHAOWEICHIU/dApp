@@ -2,6 +2,11 @@ pragma solidity ^0.4.19;
 
 import "../Math/SafeMath.sol";
 
+contract LotteryEvent {
+    event 
+}
+
+
 contract Lottery {
     
     using SafeMath for uint256;
@@ -75,3 +80,4 @@ contract Lottery {
     }
 
 }
+
