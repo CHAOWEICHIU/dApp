@@ -24,27 +24,31 @@ class Dashboard extends React.PureComponent {
   updateFiled = (key, value) => this.setState({ [key]: value })
 
   render() {
+    const { state } = this
     return (
       <Layout>
         {
           [
             { label: 'Money Pool', key: 'pool' },
           ]
-          .map(x => (
-            <Input
-              value={this.state[x.key] || ''}
-              key={x.key}
-              label={x.label} 
-              onChange={e => this.updateFiled(x.key, e.target.value)}
-            />
-          ))
+            .map(x => (
+              <Input
+                value={state[x.key] || ''}
+                key={x.key}
+                label={x.label}
+                onChange={e => this.updateFiled(x.key, e.target.value)}
+              />
+            ))
         }
-        <StyledButton>
-          GO
-        </StyledButton>        
+        <Link prefetch href="/play">
+          <StyledButton>
+            GO
+          </StyledButton>
+        </Link>
+
       </Layout>
     )
   }
 }
 
-export default Dashboard;
+export default Dashboard
