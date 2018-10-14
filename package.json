@@ -21,6 +21,7 @@
     "loglevel-colored-level-prefix": "1.0.0",
     "moment": "2.22.2",
     "next": "7.0.2",
+    "prop-types": "15.6.2",
     "react": "16.5.2",
     "react-dom": "16.5.2",
     "recompose": "0.30.0",
