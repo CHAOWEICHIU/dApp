@@ -1,6 +1,5 @@
 import React from 'react'
-import styled from 'styled-components'
-import { SortableContainer, SortableElement, arrayMove } from 'react-sortable-hoc'
+import styled, { keyframes } from 'styled-components'
 import Layout from '../components/Layout'
 import Section from '../components/Section'
 
@@ -28,6 +27,12 @@ const SectionContainer = styled.div`
   justify-content: center;
 `
 
+const shakingAnimation = keyframes`
+  100% {
+    transform: translateX(10px) translateY(10px);
+  }
+`
+
 const NumberLine = styled.div`
   height: 100px;
   display: flex;
@@ -37,14 +42,26 @@ const NumberLine = styled.div`
   color: white;
   cursor: pointer;
   user-select: none;
+  transition: color 1s;
+  &:hover {
+    animation: ${shakingAnimation} 10ms linear infinite;
+    color: red;
+    border: 1px red solid;
+  }
 `
 const NumbersContainer = styled.div`
   display: grid;
   grid-column-gap: 10px;
   grid-template-columns: auto auto auto;
+  grid-auto-rows: 125px;
   width: 100%;
   height: 500px;
   overflow: scroll;
+`
+
+const NumbersContainerPlaceHolder = styled.div`
+  width: 100%;
+  height: 500px;
 `
 
 
@@ -72,24 +89,19 @@ const Input = styled.input`
   border: transparent;
 `
 
-const SortableItem = SortableElement(({ num }) => <NumberLine>{num}</NumberLine>)
-
-const SortableNumbersContainer = SortableContainer(({ numbers }) => (
-  <NumbersContainer>
-    {numbers.map((value, index) => <SortableItem key={value} num={value} index={index} />)}
-  </NumbersContainer>
-))
-
 class Play extends React.PureComponent {
   state = {
     tempNumber: '',
     numbers: [],
   }
 
-  onSortEnd({ oldIndex, newIndex }) {
+  removeTarget = (index) => {
     const { numbers } = this.state
     this.setState({
-      numbers: arrayMove(numbers, oldIndex, newIndex),
+      numbers: [
+        ...numbers.slice(0, index),
+        ...numbers.slice(index + 1),
+      ],
     })
   }
 
@@ -136,13 +148,18 @@ class Play extends React.PureComponent {
             </StyledButton>
             {
               numbers.length === 0
-                ? null
+                ? <NumbersContainerPlaceHolder />
                 : (
-                  <SortableNumbersContainer
-                    numbers={numbers}
-                    axis="xy"
-                    onSortEnd={this.onSortEnd.bind(this)} /* eslint-disable-line */
-                  />
+                  <NumbersContainer>
+                    {numbers.map((value, index) => (
+                      <NumberLine
+                        onClick={() => this.removeTarget(index)}
+                        key={value}
+                      >
+                        {value}
+                      </NumberLine>
+                    ))}
+                  </NumbersContainer>
                 )
             }
           </Section>

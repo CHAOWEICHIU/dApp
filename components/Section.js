@@ -30,7 +30,10 @@ const Section = ({ sectionTitle, children, withoutPadding }) => (
 
 Section.propTypes = {
   sectionTitle: PropTypes.string.isRequired,
-  children: PropTypes.element.isRequired,
+  children: PropTypes.oneOfType([
+    PropTypes.element,
+    PropTypes.array,
+  ]).isRequired,
   withoutPadding: PropTypes.bool,
 }
 
