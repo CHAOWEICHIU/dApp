@@ -1,17 +1,19 @@
 module.exports = {
     "extends": [
         "airbnb",
-        "plugin:flowtype/recommended",
+        "plugin:flowtype/recommended"
     ],
-    "ecmaFeatures": {
-        "modules": true,
-        "module":  true,
+    "parserOptions": {
+        "ecmaFeatures": {
+            "jsx": true,
+            "modules": true
+        }
     },
     "plugins": [
-        "flowtype",
+        "flowtype"
     ],
     "rules": {
         "semi": [1, 'never'],
-        "react/jsx-filename-extension": [1, { "extensions": [".jsx", ".js"] }],
+        "react/jsx-filename-extension": [1, { "extensions": [".jsx", ".js"] }]
     }
 };
