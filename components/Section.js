@@ -16,13 +16,13 @@ const SectionTitleText = styled.div`
   border-bottom: 1px rgba(120,120,120, 0.7) solid;
 `
 const SectionTextWrapper = styled.div`
-  padding: 20px;
+  ${props => !props.withoutPadding && 'padding: 20px;'}
 `
 
-const Section = ({ sectionTitle, children }) => (
+const Section = ({ sectionTitle, children, withoutPadding }) => (
   <SectionWrapper>
     <SectionTitleText>{sectionTitle}</SectionTitleText>
-    <SectionTextWrapper>
+    <SectionTextWrapper withoutPadding={withoutPadding}>
       {children}
     </SectionTextWrapper>
   </SectionWrapper>
@@ -31,6 +31,11 @@ const Section = ({ sectionTitle, children }) => (
 Section.propTypes = {
   sectionTitle: PropTypes.string.isRequired,
   children: PropTypes.element.isRequired,
+  withoutPadding: PropTypes.bool,
+}
+
+Section.defaultProps = {
+  withoutPadding: false,
 }
 
 export default Section
