@@ -110,6 +110,40 @@ const StyledInputWrapper = styled.div`
   display: flex;
 `
 
+const Spacer = styled.div`
+  width: 100%;
+  height: 150px;
+`
+
+const NoticeMessage = styled.div`
+  width: 845px;
+  min-height: 50px;
+  background: rgb(20,28,30);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+  border: 1px rgba(120,120,120, 0.7) solid;
+`
+
+const YellowText = styled.span`
+  color:#FF9A00;
+  margin-right: 5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+`
+const WhiteText = styled.span`
+  color: white;
+  margin-right: 5px;
+  letter-spacing: 2px;
+`
+
+const apiData = {
+  totalBoughtKey: 231412,
+  totalMoneyInLotteryPool: 21421,
+  totalMoneyInWinningPool: 441221,
+  totalMoneyInPassiveIncomePool: 21341,
+}
 
 class Play extends React.PureComponent {
   state = {
@@ -150,7 +184,10 @@ class Play extends React.PureComponent {
           <Section sectionTitle="Money Pool">
             <LineWrapper>
               <EthImg src="static/eth.svg" />
-              <Color>$ 342,131,212</Color>
+              <Color>
+                $
+                {apiData.totalMoneyInLotteryPool}
+              </Color>
             </LineWrapper>
           </Section>
           <Section sectionTitle="Total Bought Numbers">
@@ -159,6 +196,37 @@ class Play extends React.PureComponent {
               <Color>102,412</Color>
             </LineWrapper>
           </Section>
+        </SectionContainer>
+        <SectionContainer>
+          <Section sectionTitle="Passive Income">
+            <LineWrapper>
+              <EthImg src="static/eth.svg" />
+              <Color>To earn 0.0931 every number is bought</Color>
+            </LineWrapper>
+          </Section>
+          <Section sectionTitle="Lottery Pool">
+            <LineWrapper>
+              <EthImg src="static/eth.svg" />
+              <Color>13.45</Color>
+            </LineWrapper>
+          </Section>
+        </SectionContainer>
+
+        <Spacer />
+
+        <SectionContainer>
+          <NoticeMessage>
+            <WhiteText>Spend 204 to win</WhiteText>
+            <YellowText>
+              310421 ETH
+            </YellowText>
+          </NoticeMessage>
+          <NoticeMessage>
+            <WhiteText>You have 21% chance to win</WhiteText>
+            <YellowText>
+              13.45 ETH
+            </YellowText>
+          </NoticeMessage>
         </SectionContainer>
 
         <SectionContainer>
