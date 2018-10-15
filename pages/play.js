@@ -49,6 +49,12 @@ const NumberLine = styled.div`
     border: 1px red solid;
   }
 `
+
+const FullWidthNumberLine = NumberLine.extend`
+  width: 97%;
+  margin-bottom: 25px;
+`
+
 const NumbersContainer = styled.div`
   display: grid;
   grid-column-gap: 10px;
@@ -59,9 +65,10 @@ const NumbersContainer = styled.div`
   overflow: scroll;
 `
 
-const NumbersContainerPlaceHolder = styled.div`
+const NumbersContainerWrapper = styled.div`
   width: 100%;
   height: 500px;
+  overflow: scroll;
 `
 
 
@@ -89,18 +96,36 @@ const Input = styled.input`
   border: transparent;
 `
 
+const StyledInput = Input.extend`
+  width: 100%;
+  margin-right: ${props => (props.marginRight ? '2%' : '0')}
+  ${props => props.isDisabled && `
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+  `}
+`
+
+const StyledInputWrapper = styled.div`
+  display: flex;
+`
+
+
 class Play extends React.PureComponent {
   state = {
     tempNumber: '',
+    tempNumberFrom: '',
+    tempNumberTo: '',
     numbers: [],
+    numberRanges: [],
   }
 
-  removeTarget = (index) => {
-    const { numbers } = this.state
+  removeTarget = (key, index) => {
+    const targets = this.state[key] /* eslint-disable-line */
     this.setState({
-      numbers: [
-        ...numbers.slice(0, index),
-        ...numbers.slice(index + 1),
+      [key]: [
+        ...targets.slice(0, index),
+        ...targets.slice(index + 1),
       ],
     })
   }
@@ -108,7 +133,17 @@ class Play extends React.PureComponent {
   updateFiled = (key, value) => this.setState({ [key]: value })
 
   render() {
-    const { numbers, tempNumber } = this.state
+    const {
+      numbers,
+      tempNumber,
+      numberRanges,
+      tempNumberFrom,
+      tempNumberTo,
+    } = this.state
+
+    const isValidNumberInput = !(tempNumber === '')
+    const isValidNumberRangeInput = !(tempNumberFrom === '' || tempNumberTo === '')
+
     return (
       <Layout>
         <SectionContainer>
@@ -135,9 +170,9 @@ class Play extends React.PureComponent {
               value={tempNumber}
             />
             <StyledButton
-              isDisabled={tempNumber === ''}
+              isDisabled={!isValidNumberInput}
               onClick={() => {
-                if (tempNumber === '') return
+                if (!isValidNumberInput) return
                 this.setState({
                   tempNumber: '',
                   numbers: [tempNumber, ...numbers],
@@ -148,12 +183,12 @@ class Play extends React.PureComponent {
             </StyledButton>
             {
               numbers.length === 0
-                ? <NumbersContainerPlaceHolder />
+                ? <NumbersContainerWrapper />
                 : (
                   <NumbersContainer>
                     {numbers.map((value, index) => (
                       <NumberLine
-                        onClick={() => this.removeTarget(index)}
+                        onClick={() => this.removeTarget('numbers', index)}
                         key={value}
                       >
                         {value}
@@ -163,12 +198,59 @@ class Play extends React.PureComponent {
                 )
             }
           </Section>
-          {/* <Section sectionTitle="Range Number">
-            <LineWrapper>
-              <EthImg src="static/eth.svg" />
-              <Color>102,412</Color>
-            </LineWrapper>
-          </Section> */}
+          <Section sectionTitle="Range Number">
+            <StyledInputWrapper>
+              <StyledInput
+                value={tempNumberFrom}
+                onChange={e => this.updateFiled('tempNumberFrom', e.target.value)}
+                marginRight
+                type="number"
+                min="0"
+              />
+              <StyledInput
+                value={tempNumberTo}
+                onChange={e => this.updateFiled('tempNumberTo', e.target.value)}
+                isDisabled={tempNumberFrom === ''}
+                type="number"
+                min={tempNumberFrom === '' ? '0' : tempNumberFrom}
+              />
+            </StyledInputWrapper>
+            <StyledButton
+              isDisabled={!isValidNumberRangeInput}
+              onClick={() => {
+                if (!isValidNumberRangeInput) return
+                this.setState({
+                  tempNumberFrom: '',
+                  tempNumberTo: '',
+                  numberRanges: [
+                    { from: tempNumberFrom, to: tempNumberTo },
+                    ...numberRanges,
+                  ],
+                })
+              }}
+            >
+              +
+            </StyledButton>
+            {
+              numberRanges.length === 0
+                ? <NumbersContainerWrapper />
+                : (
+                  <NumbersContainerWrapper>
+                    {numberRanges.map((numberRange, index) => (
+                      <FullWidthNumberLine
+                        key={`${numberRange.from}-${numberRange.to}`}
+                        onClick={() => this.removeTarget('numberRanges', index)}
+                      >
+                        {numberRange.from}
+                        -
+                        {numberRange.to}
+                      </FullWidthNumberLine>
+                    ))}
+                  </NumbersContainerWrapper>
+                )
+
+            }
+          </Section>
         </SectionContainer>
       </Layout>
     )
