@@ -1,5 +1,6 @@
 import React from 'react'
 import styled, { keyframes } from 'styled-components'
+import { VictoryPie } from 'victory'
 import Layout from '../components/Layout'
 import Section from '../components/Section'
 
@@ -50,7 +51,7 @@ const NumberLine = styled.div`
   }
 `
 
-const FullWidthNumberLine = NumberLine.extend`
+const FullWidthNumberLine = styled(NumberLine)`
   width: 97%;
   margin-bottom: 25px;
 `
@@ -96,7 +97,7 @@ const Input = styled.input`
   border: transparent;
 `
 
-const StyledInput = Input.extend`
+const StyledInput = styled(Input)`
   width: 100%;
   margin-right: ${props => (props.marginRight ? '2%' : '0')}
   ${props => props.isDisabled && `
@@ -138,12 +139,6 @@ const WhiteText = styled.span`
   letter-spacing: 2px;
 `
 
-const apiData = {
-  totalBoughtKey: 231412,
-  totalMoneyInLotteryPool: 21421,
-  totalMoneyInWinningPool: 441221,
-  totalMoneyInPassiveIncomePool: 21341,
-}
 
 class Play extends React.PureComponent {
   state = {
@@ -181,19 +176,38 @@ class Play extends React.PureComponent {
     return (
       <Layout>
         <SectionContainer>
-          <Section sectionTitle="Money Pool">
+          <Section sectionTitle="Allocation">
+            <VictoryPie
+              style={{
+                labels: {
+                  fill: 'white',
+                  fontSize: 15,
+                  fontWeight: 'bold',
+                },
+              }}
+              labelRadius={50}
+              colorScale={['#0F1E32', '#21BEDA', '#013859']}
+              data={[
+                { x: 1, y: 10, label: 'Passive\n10%' },
+                { x: 2, y: 50, label: 'Winning\n50%' },
+                { x: 0, y: 40, label: 'Lottery\n40%' },
+              ]}
+            />
+          </Section>
+        </SectionContainer>
+        <SectionContainer>
+          <Section sectionTitle="Winning Pot">
             <LineWrapper>
               <EthImg src="static/eth.svg" />
               <Color>
-                $
-                {apiData.totalMoneyInLotteryPool}
+                120,332
               </Color>
             </LineWrapper>
           </Section>
-          <Section sectionTitle="Total Bought Numbers">
+          <Section sectionTitle="Lottery Pot">
             <LineWrapper>
               <EthImg src="static/eth.svg" />
-              <Color>102,412</Color>
+              <Color>10.4</Color>
             </LineWrapper>
           </Section>
         </SectionContainer>
@@ -204,10 +218,10 @@ class Play extends React.PureComponent {
               <Color>To earn 0.0931 every number is bought</Color>
             </LineWrapper>
           </Section>
-          <Section sectionTitle="Lottery Pool">
+          <Section sectionTitle="To Be Continue">
             <LineWrapper>
               <EthImg src="static/eth.svg" />
-              <Color>13.45</Color>
+              <Color>Working In progress</Color>
             </LineWrapper>
           </Section>
         </SectionContainer>
