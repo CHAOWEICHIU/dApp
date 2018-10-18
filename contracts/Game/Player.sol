@@ -7,6 +7,8 @@ contract PlayerBook {
     mapping (bytes32 => uint256) public pIDxName_;          // (name => pID) returns player id by name
     mapping (uint256 => Player) public plyr_;               // (pID => data) player data
     
+    
+    
     struct Player {
         address addr;
         bytes32 name;
@@ -21,7 +23,6 @@ contract PlayerBook {
         plyr_[0].name = "wayne";
         pIDxAddr_[msg.sender] = 0;
         pIDxName_["wayne"] = 0;
-        totalPlayerCount ++;
     }
     
     
@@ -47,4 +48,26 @@ contract PlayerBook {
         
     }
     
+    function depositMoney()
+        public
+        payable
+    {
+        require(msg.value > 0, "need money");
+        uint256 affiliationAmount = msg.value / 10;
+        address _addr = msg.sender;
+        uint256 _playerId  = pIDxAddr_[_addr];
+        uint256 _affiliatePlayerId = plyr_[_playerId].laff;
+        plyr_[_affiliatePlayerId].claimable = affiliationAmount;
+        plyr_[_playerId].claimable = msg.value - affiliationAmount;
+    }
+    
+    function claimMoney()
+        public
+    {
+        address _addr = msg.sender;
+        Player storage player = plyr_[pIDxAddr_[_addr]];
+        require(player.claimable != 0, "you don't have money to claim");
+        player.claimable = 0;
+        _addr.transfer(player.claimable);
+    }
 }
