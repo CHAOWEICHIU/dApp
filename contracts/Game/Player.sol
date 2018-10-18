@@ -53,9 +53,10 @@ contract PlayerBook {
         
     }
     
-    function depositMoney()
+    function deposit()
         public
         payable
+        returns (bool)
     {
         require(msg.value > 0, "need money");
         uint256 affiliationAmount = msg.value / 10;
@@ -66,8 +67,10 @@ contract PlayerBook {
         if(_playerId != 0) {
             plyr_[_affiliatePlayerId].claimable = affiliationAmount;
             plyr_[_playerId].claimable = msg.value - affiliationAmount;
+            return true;
         }
         plyr_[0].claimable = msg.value;
+        return false;
     }
     
     function claimMoney()

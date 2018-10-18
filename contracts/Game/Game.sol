@@ -2,21 +2,39 @@ pragma solidity ^0.4.19;
 
 import "../Math/SafeMath.sol";
 
+interface PlayerBookInterface {
+    function getPlayerName(address _addr) external view returns(bytes32);
+    function deposit() external payable returns(bool);
+}
+
 contract NumberGame {
     using SafeMath for uint256;
+    address constant playbookContractAddress_ = 0x36D0c69bbe0b92617CEC03364e55cA44D8918614;
 
+    PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
+
+    uint256 public keyPrice_ = 1 ether;
     uint256 public gameAtivationFee_ = 1 ether;
     uint256 public totalGameCount_ = 0;
     uint256 public currentLottryPot_ = 0;
+
+    uint256 private rand_;
+
     mapping (uint256 => Game) public games_;
 
     struct Game {
         address bankerAddress;
         address winnerAddress;
+        uint256 rand;
         uint256 totalAmount;
         uint gameTotalTime;
         uint startTime;
         uint endTime;
+        mapping(bytes32 => bytes32[]) userKeys;
+    }
+
+    function hashHelper(uint _value, uint _rand) public pure returns(bytes32) {
+        return keccak256(_value, _rand);
     }
 
     function startGame()
@@ -31,15 +49,59 @@ contract NumberGame {
         games_[totalGameCount_].bankerAddress = bankerAddress;
 
 
-        currentLottryPot_ = depositAmount.sub(10).div(1);
+        currentLottryPot_ = depositAmount.sub(10);
         // uint256 goOutAmount = depositAmount.sub(10).div(1);
         // call PlayBook deposit function
 
-        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).div(8);
+        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).mul(8);
         
         games_[totalGameCount_].gameTotalTime = 12 hours;
         games_[totalGameCount_].startTime = now;
         games_[totalGameCount_].endTime = now + 12 hours;
+
+        // change rand key
+        rand_ = now % block.number;
+    }
+    
+    function getKeys()
+        public
+        view
+        returns(bytes32[])
+    {
+        Game storage currentGame = games_[totalGameCount_];
+        address playerAddress = msg.sender;
+        bytes32 userName = PlayerBook.getPlayerName(playerAddress);
+        return currentGame.userKeys[userName];
+    }
+
+    function buyKeys(uint256[] _keys)
+      public
+      payable
+    {
+        address playerAddress = msg.sender;
+        Game storage currentGame = games_[totalGameCount_];
+        bytes32 userName = PlayerBook.getPlayerName(playerAddress);
+        uint256 costTotalKeys = keyPrice_.mul(_keys.length);
+
+        require(msg.value > costTotalKeys, "Not enough money");
+        
+        uint256 lotteryMoney = msg.value.sub(10);
+        uint256 winningAmount = msg.value.sub(10).mul(8);
+        uint256 potPassingIncomeAmount = msg.value.sub(10);
+        PlayerBook.deposit.value(potPassingIncomeAmount)();
+        currentLottryPot_ = currentLottryPot_.add(lotteryMoney);
+        currentGame.totalAmount = currentGame.totalAmount.add(winningAmount);
+        
+        for (uint i = 0; i < _keys.length; i++) {
+            currentGame.userKeys[userName].push(hashHelper(_keys[i], rand_));
+            playLottry();
+        }
+    }
+    
+    function playLottry()
+        internal
+    {
+        // if wins, deposit money to PlayerBook, reset lottery pool, and emit that event
     }
 
 }
