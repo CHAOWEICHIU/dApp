@@ -75,7 +75,7 @@ contract NumberGame is GameEvents {
 
 
         currentLottryPot_ = depositAmount.sub(10);
-        uint256 goOutAmount = depositAmount.sub(10).div(1);
+        uint256 goOutAmount = depositAmount.sub(10);
         PlayerBook.deposit.value(goOutAmount)();
 
         games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).mul(8);
