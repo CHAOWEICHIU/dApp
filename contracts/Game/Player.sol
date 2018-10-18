@@ -1,6 +1,14 @@
 pragma solidity ^0.4.19;
 
-contract PlayerBook {
+contract PlayerBookEvents {
+    event onNewUser
+    (
+        address indexed UserAddress,
+        bytes32 indexed userName
+    );
+}
+
+contract PlayerBook is PlayerBookEvents {
     uint256 public totalPlayerCount = 0;                    // total players
     uint256 public registrationFee_ = 10 finney;            // price to register a name
     mapping (address => uint256) public pIDxAddr_;          // (addr => pID) returns player id by address
@@ -34,6 +42,7 @@ contract PlayerBook {
     function registerPlayer(bytes32 _nameString, uint256 _affCode)
         public
         payable
+        returns (bool)
     {
         // make sure name fees paid
         require (msg.value >= registrationFee_, "umm.....  you have to pay the name fee");
@@ -50,6 +59,13 @@ contract PlayerBook {
         pIDxAddr_[_addr] = totalPlayerCount;
         pIDxName_[_nameString] = totalPlayerCount;
         plyr_[totalPlayerCount].laff = _affCode;
+
+        emit onNewUser(
+            _addr,
+            _nameString
+        );
+
+        return (true);
         
     }
     

@@ -7,13 +7,33 @@ interface PlayerBookInterface {
     function deposit() external payable returns(bool);
 }
 
-contract NumberGame {
+contract GameEvents {
+    event onLotteryWin
+    (
+        address indexed playerAddress,
+        bytes32 indexed playerName,
+        uint256 timeStamp,
+        uint256 winningAmount
+    );
+    event onGameStart
+    (
+        address indexed bankerAddress,
+        bytes32 indexed bankerName,
+        uint256 timeStamp,
+        uint256 initialAmount,
+        uint256 round
+    );
+    
+}
+
+
+contract NumberGame is GameEvents {
     using SafeMath for uint256;
     address constant playbookContractAddress_ = 0x36D0c69bbe0b92617CEC03364e55cA44D8918614;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
 
-    uint256 public keyPrice_ = 1 ether;
+    uint256 public keyPrice_ = 0.1 ether;
     uint256 public gameAtivationFee_ = 1 ether;
     uint256 public totalGameCount_ = 0;
     uint256 public currentLottryPot_ = 0;
@@ -34,12 +54,17 @@ contract NumberGame {
     }
 
     function hashHelper(uint _value, uint _rand) public pure returns(bytes32) {
-        return keccak256(_value, _rand);
+        return keccak256(abi.encodePacked(_value, _rand));
+    }
+    
+    function random() public view returns (uint8) {
+        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
     }
 
     function startGame()
       public
       payable
+      returns (bool)
     {
         address bankerAddress = msg.sender;
         uint256 depositAmount = msg.value;
@@ -50,8 +75,8 @@ contract NumberGame {
 
 
         currentLottryPot_ = depositAmount.sub(10);
-        // uint256 goOutAmount = depositAmount.sub(10).div(1);
-        // call PlayBook deposit function
+        uint256 goOutAmount = depositAmount.sub(10).div(1);
+        PlayerBook.deposit.value(goOutAmount)();
 
         games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).mul(8);
         
@@ -61,6 +86,14 @@ contract NumberGame {
 
         // change rand key
         rand_ = now % block.number;
+        emit onGameStart(
+            bankerAddress,
+            PlayerBook.getPlayerName(bankerAddress),
+            now,
+            games_[totalGameCount_].totalAmount,
+            totalGameCount_
+        );
+        return (true);
     }
     
     function getKeys()
@@ -100,8 +133,19 @@ contract NumberGame {
     
     function playLottry()
         internal
+        returns(bool)
     {
-        // if wins, deposit money to PlayerBook, reset lottery pool, and emit that event
+        if(random() > 50) {
+            PlayerBook.deposit.value(currentLottryPot_)();
+            currentLottryPot_ = 0;
+            return (true);
+            emit onLotteryWin(
+                msg.sender,
+                PlayerBook.getPlayerName(msg.sender),
+                now,
+                currentLottryPot_
+            );
+        }
+        return (false);
     }
-
 }
