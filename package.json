@@ -14,9 +14,11 @@
   "dependencies": {
     "dotenv": "6.0.0",
     "ganache-cli": "6.1.8",
+    "lodash": "4.17.11",
     "loglevel-colored-level-prefix": "1.0.0",
     "moment": "2.22.2",
     "next": "7.0.2",
+    "node-fetch": "2.2.0",
     "prop-types": "15.6.2",
     "react": "16.5.2",
     "react-dom": "16.5.2",
