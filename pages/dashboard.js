@@ -2,7 +2,7 @@ import React from 'react'
 import styled from 'styled-components'
 import Link from 'next/link'
 import PropTypes from 'prop-types'
-import { div } from '../utils/calculation'
+import { div, mul } from '../utils/calculation'
 import withContracts from '../lib/withContracts'
 import Section from '../components/Section'
 import Layout from '../components/Layout'
@@ -16,15 +16,15 @@ const SectionWrapper = styled.div`
 `
 
 const StyledButton = styled.div`
+  margin-top: 50px;
   cursor: pointer;
-  width: 300px;
-  height: 30px;
+  width: 340px;
+  height: 15px;
   padding: 10px;
   border: 1px white solid;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
 `
 
 const SectionLabel = styled.div`
@@ -40,10 +40,8 @@ const SectionContent = styled.div`
 class Dashboard extends React.PureComponent {
   constructor(props) {
     super(props)
-    const { web3, contracts: { playerBook } } = this.props
+    const { web3, contracts: { playerBook, numberGame } } = this.props
     this.state = {
-      ready: false,
-      totalPlayerCount: 0,
       user: {
         address: '',
         balance: '0',
@@ -56,13 +54,17 @@ class Dashboard extends React.PureComponent {
         claimable: '0',
         name: '',
       },
+      initReward: '',
+      currentGame: '',
     }
     this.web3 = web3
     this.playerBook = playerBook
+    this.numberGame = numberGame
   }
 
   componentDidMount() {
     this.polling = setInterval(this.updateUserInfo, 2000)
+    this.gamePooling = setInterval(this.getCurrentGame, 2000)
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -97,7 +99,16 @@ class Dashboard extends React.PureComponent {
     if (this.polling) {
       clearInterval(this.polling)
     }
+    if (this.gamePooling) {
+      clearInterval(this.polling)
+    }
   }
+
+  getCurrentGame = () => this.numberGame
+    .methods
+    .totalGameCount_()
+    .call()
+    .then(game => this.setState({ currentGame: game }))
 
   updateUserInfo = () => this.web3.eth
     .getAccounts()
@@ -128,11 +139,30 @@ class Dashboard extends React.PureComponent {
 
   updateFiled = (key, value) => this.setState({ [key]: value })
 
+  startGame = () => {
+    const { user } = this.state
+    this.numberGame.methods.startGame()
+      .send({
+        from: user.address,
+        gasPrice: this.web3.utils.unitMap.szabo,
+        gas: '3000000',
+        value: mul(this.web3.utils.unitMap.ether, 2),
+      })
+      .then((res) => {
+        console.log('res', res)
+      })
+      .catch((err) => {
+        console.log('err', err)
+      })
+  }
+
   render() {
     const { state } = this
     const {
       user,
       laffUser,
+      initReward,
+      currentGame,
     } = state
     return (
       <Layout>
@@ -158,25 +188,36 @@ class Dashboard extends React.PureComponent {
             <SectionContent>{laffUser.claimable}</SectionContent>
           </Section>
         </SectionWrapper>
-        {
-          [
-            { label: 'Money Pool', key: 'pool' },
-          ]
-            .map(x => (
-              <Input
-                value={state[x.key] || ''}
-                key={x.key}
-                label={x.label}
-                onChange={e => this.updateFiled(x.key, e.target.value)}
-              />
-            ))
-        }
-        <Link prefetch href="/play">
-          <StyledButton>
+        <SectionWrapper>
+          <Section sectionTitle="Game Setting">
+            <select>
+              <option value="guessing_number_game">guessing number game</option>
+            </select>
+            <br />
+            <br />
+            <Input
+              type="number"
+              value={initReward}
+              label="Reward"
+              min="0"
+              onChange={e => this.updateFiled('initReward', e.target.value)}
+            />
+            <StyledButton onClick={() => this.startGame()}>
             GO
-          </StyledButton>
-        </Link>
-
+            </StyledButton>
+          </Section>
+        </SectionWrapper>
+        <SectionWrapper>
+          <Section sectionTitle="Active Game">
+            { currentGame && (
+              <Link prefetch href={`/game/${currentGame}`} as="/game">
+                <StyledButton>
+                    Go To Game
+                </StyledButton>
+              </Link>
+            ) }
+          </Section>
+        </SectionWrapper>
       </Layout>
     )
   }

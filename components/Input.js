@@ -21,7 +21,6 @@ const InputPadding = styled.div`
   background: rgb(38, 52, 60);
   width: 300px;
   padding: 0 20px;
-  border-radius: 10px;
 `
 
 const StyledText = styled.div`
