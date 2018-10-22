@@ -2,7 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import styled from 'styled-components'
 
-const SectionWrapper = styled.div`
+const SectionContainer = styled.div`
   width: 400px;
   border: 1px rgba(120,120,120, 0.7) solid;
   margin: 20px;
@@ -19,13 +19,36 @@ const SectionTextWrapper = styled.div`
   ${props => !props.withoutPadding && 'padding: 20px;'}
 `
 
-const Section = ({ sectionTitle, children, withoutPadding }) => (
-  <SectionWrapper>
+export const SectionLabel = styled.div`
+  color: gray;
+  font-size: 14px;
+`
+export const SectionContent = styled.div`
+  color: white;
+  font-size: 16px;
+  margin-bottom: 10px;
+`
+
+export const SectionWrapper = styled.div`
+  padding: 30px;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+`
+
+const Section = ({
+  sectionTitle,
+  children,
+  withoutPadding,
+  className,
+}) => (
+  <SectionContainer className={className}>
     <SectionTitleText>{sectionTitle}</SectionTitleText>
     <SectionTextWrapper withoutPadding={withoutPadding}>
       {children}
     </SectionTextWrapper>
-  </SectionWrapper>
+  </SectionContainer>
 )
 
 Section.propTypes = {
@@ -35,6 +58,7 @@ Section.propTypes = {
     PropTypes.array,
   ]).isRequired,
   withoutPadding: PropTypes.bool,
+  className: PropTypes.string, /* eslint-disable-line */
 }
 
 Section.defaultProps = {

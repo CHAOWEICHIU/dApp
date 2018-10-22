@@ -19,7 +19,7 @@ const StyledInput = styled.input`
 `
 const InputPadding = styled.div`
   background: rgb(38, 52, 60);
-  width: 300px;
+  width ${props => (props.hasLabel ? '300px' : '100%')};
   padding: 0 20px;
 `
 
@@ -32,15 +32,15 @@ const StyledText = styled.div`
 
 const Input = ({ label, ...props }) => (
   <StyledTextWrapper>
-    <StyledText>{label}</StyledText>
-    <InputPadding>
+    { label && (<StyledText>{label}</StyledText>) }
+    <InputPadding hasLabel={label}>
       <StyledInput {...props} />
     </InputPadding>
   </StyledTextWrapper>
 )
 
 Input.propTypes = {
-  label: PropTypes.string.isRequired,
+  label: PropTypes.string, /* eslint-disable-line */
 }
 
 export default Input

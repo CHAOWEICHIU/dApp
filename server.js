@@ -14,6 +14,9 @@ app.prepare().then(() => {
   // Server-side
 
   server.get('/game/:id', (req, res) => {
+    if (req.params.id === 'list' || !req.params.id) {
+      return app.render(req, res, '/game/list', req.params)
+    }
     return app.render(req, res, '/game', req.params)
   })
 

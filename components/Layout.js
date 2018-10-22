@@ -3,7 +3,9 @@ import styled from 'styled-components'
 import Link from 'next/link'
 
 const Links = [
-  { name: '首頁', url: '/' },
+  { name: 'Home', url: '/' },
+  { name: 'Game', url: '/game/list' },
+  { name: 'Register', url: '/user/register' },
 ]
 const Background = styled.div`
 background:black;

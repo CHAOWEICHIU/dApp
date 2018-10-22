@@ -2,11 +2,11 @@ import React from 'react'
 import moment from 'moment'
 import styled, { keyframes } from 'styled-components'
 import PropTypes from 'prop-types'
-import { div, mul } from '../utils/calculation'
-import withContracts from '../lib/withContracts'
-import Section from '../components/Section'
-import Layout from '../components/Layout'
-import Input from '../components/Input'
+import { div, mul } from '../../utils/calculation'
+import withContracts from '../../lib/withContracts'
+import Section from '../../components/Section'
+import Layout from '../../components/Layout'
+import Input from '../../components/Input'
 
 const SectionWrapper = styled.div`
   padding: 10px;
