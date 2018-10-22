@@ -267,7 +267,7 @@ const MainPage = () => (
       </BlockChainWrapper>
     </WrapperD>
     <WrapperC>
-      <Link prefetch href="/dashboard">
+      <Link prefetch href="/game/list">
         <PurchaseButton>Ready?</PurchaseButton>
       </Link>
     </WrapperC>

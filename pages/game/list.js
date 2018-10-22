@@ -104,8 +104,8 @@ class GameList extends React.PureComponent {
     if (this.polling) {
       clearInterval(this.polling)
     }
-    if (this.gamePooling) {
-      clearInterval(this.gamePooling)
+    if (this.gamePolling) {
+      clearInterval(this.gamePolling)
     }
   }
 
@@ -194,7 +194,7 @@ class GameList extends React.PureComponent {
         ) }
         <SectionWrapper>
           {activeGames.length > 0 && activeGames.map(activeGame => (
-            <Section sectionTitle="Active Game">
+            <Section sectionTitle="Active Game" key={`${activeGame.id}-section`}>
               <SectionLabel>Game Index</SectionLabel>
               <SectionContent>{activeGame.id}</SectionContent>
               <br />
@@ -211,7 +211,7 @@ class GameList extends React.PureComponent {
             {inActiveGames.map(game => (
               <StyledSection
                 sectionTitle={`Game ID ${game.id}`}
-                key={game.id}
+                key={`${game.id}-styled-section`}
                 disable
               >
                 <SectionLabel>ID</SectionLabel>

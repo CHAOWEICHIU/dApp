@@ -4,30 +4,13 @@ import styled, { keyframes } from 'styled-components'
 import PropTypes from 'prop-types'
 import { div, mul } from '../../utils/calculation'
 import withContracts from '../../lib/withContracts'
-import Section from '../../components/Section'
+import Section, { SectionLabel, SectionContent, SectionWrapper } from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
-
-const SectionWrapper = styled.div`
-  padding: 10px;
-  display: flex;
-  width: 100%;
-  justify-content: center;
-`
 
 const LineWrapper = styled.div`
   display: flex;
   align-items: flex-end;
-`
-
-const SectionLabel = styled.div`
-  color: gray;
-  font-size: 14px;
-`
-const SectionContent = styled.div`
-  color: white;
-  font-size: 16px;
-  margin-bottom: 10px;
 `
 
 const EthImg = styled.img`
@@ -125,13 +108,15 @@ class Game extends React.PureComponent {
       },
       tempNumber: '',
       numbers: [],
+      keyPrice: '0',
     }
   }
 
   componentDidMount() {
-    const { params: { id } } = this.props
+    const { params: { id }, contractMethods: { getKeyPrice } } = this.props
     this.gamePooling = setInterval(this.fetchGameInfo(id), 1000)
     this.polling = setInterval(this.updateUserInfo, 2000)
+    getKeyPrice().then(price => this.setState({ keyPrice: price }))
   }
 
   componentWillUnmount() {
@@ -172,21 +157,16 @@ class Game extends React.PureComponent {
     })
   }
 
-  buyKeys = (keys, address) => this.numberGame
-    .methods
-    .buyKeys(keys)
-    .send({
-      from: address,
-      gasPrice: this.web3.utils.unitMap.szabo,
-      gas: '3000000',
-      value: mul(this.web3.utils.unitMap.ether, '0.11', keys.length),
-    })
-    .then((res) => {
-      console.log(res);
-    })
-    .catch((err) => {
-      console.log(err);
-    })
+  buyKeys = (keys, address) => {
+    const { contractMethods } = this.props
+    contractMethods.buyKeys({ keys, address })
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
+      })
+  }
 
   fetchGameInfo = (id) => {
     const { contractMethods: { getCurrentLotteryPotAmount, getGameById } } = this.props
@@ -207,6 +187,7 @@ class Game extends React.PureComponent {
       tempNumber,
       numbers,
       user,
+      keyPrice,
     } = this.state
     const isValidNumberInput = !(tempNumber === '')
     const countDownTimeDiff = moment(game.endTime).diff(moment())
@@ -272,6 +253,13 @@ class Game extends React.PureComponent {
         </SectionWrapper>
         <SectionWrapper>
           <Section sectionTitle="Buy Key">
+            <SectionLabel>Price</SectionLabel>
+            <SectionContent>
+              {mul(keyPrice, numbers.length, '1.1')}
+              {' '}
+              ETH
+            </SectionContent>
+            <br />
             <BuyButton onClick={() => this.buyKeys(numbers, user.address)}>Buy</BuyButton>
             <Input
               label="Key"
