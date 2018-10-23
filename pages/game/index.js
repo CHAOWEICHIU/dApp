@@ -134,7 +134,7 @@ class Game extends React.PureComponent {
 
   componentDidMount() {
     const { params: { id }, contractMethods: { getKeyPrice, getSnapshotKeyPrice } } = this.props
-    this.gamePooling = setInterval(this.fetchGameInfo(id), 1000)
+    this.gamePooling = setInterval(() => this.fetchGameInfo(id), 1000)
     this.polling = setInterval(this.updateUserInfo, 2000)
     getKeyPrice().then(price => this.setState({ keyPrice: price }))
     getSnapshotKeyPrice().then(price => this.setState({ snapshotKeyPrice: price }))
@@ -181,7 +181,7 @@ class Game extends React.PureComponent {
   buyKeys = (keys, address) => {
     const { contractMethods, params: { id } } = this.props
     contractMethods.buyKeys({ keys, address, round: id })
-      .then(() => this.setState({ numbers: [] }))
+      .then(() => this.setState({ numbers: [], snapshotNumberMessage: '' }))
       .catch((err) => {
         console.log(err)
       })
@@ -190,7 +190,7 @@ class Game extends React.PureComponent {
   snapshotKeys = (keys, address) => {
     const { contractMethods, params: { id } } = this.props
     contractMethods.snapshotKeys({ keys, address, round: id })
-      .then(() => this.setState({ numbers: [] }))
+      .then(() => this.setState({ numbers: [], snapshotNumberMessage: '' }))
       .catch((err) => {
         console.log(err)
       })
@@ -212,6 +212,7 @@ class Game extends React.PureComponent {
   }
 
   fetchGameInfo = (id) => {
+    console.log('id', id);
     const { contractMethods: { getCurrentLotteryPotAmount, getGameById } } = this.props
     Promise.all([
       getCurrentLotteryPotAmount(),
