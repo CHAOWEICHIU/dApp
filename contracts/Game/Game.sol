@@ -92,36 +92,28 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x36D0c69bbe0b92617CEC03364e55cA44D8918614;
+    address constant playbookContractAddress_ = 0xf81D87132376DC852e198B3b02C4EFfD6b0D81f8;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
 
-    uint256 public keyPrice_ = 0.1 ether;
-    uint256 public gameAtivationFee_ = 1 ether;
+    uint256 public keyPrice_ = 0.5 ether;
+    uint256 public gameActivationFee_ = 1 ether;
     uint256 public totalGameCount_ = 0;
     uint256 public currentLottryPot_ = 0;
-
-    uint256 private rand_;
+    uint256 public keyRevealFee_ = 0.2 ether;
 
     mapping (uint256 => Game) public games_;
 
     struct Game {
         address bankerAddress;
         address winnerAddress;
-        uint256 rand;
         uint256 totalAmount;
         uint gameTotalTime;
         uint startTime;
         uint endTime;
-        mapping(bytes32 => bytes32[]) userKeys;
-    }
-
-    function hashHelper(uint _value, uint _rand) public pure returns(bytes32) {
-        return keccak256(abi.encodePacked(_value, _rand));
-    }
-    
-    function random() public view returns (uint8) {
-        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
+        mapping(uint256 => uint256) keys;
+        mapping(uint256 => uint256) snapshotKeys;
+        mapping(bytes32 => uint256[]) userKeys;
     }
 
     function startGame()
@@ -131,9 +123,8 @@ contract NumberGame is GameEvents {
     {
         address bankerAddress = msg.sender;
         uint256 depositAmount = msg.value;
-        require (depositAmount >= gameAtivationFee_, "umm.....  you have to pay the name fee");
+        require (depositAmount >= gameActivationFee_, "umm.....  you have to pay the name fee");
         totalGameCount_++;
-        require(games_[totalGameCount_].endTime < now, "game in progress");
         games_[totalGameCount_].bankerAddress = bankerAddress;
 
 
@@ -147,8 +138,6 @@ contract NumberGame is GameEvents {
         games_[totalGameCount_].startTime = now;
         games_[totalGameCount_].endTime = now + 12 hours;
 
-        // change rand key
-        rand_ = now % block.number;
         emit onGameStart(
             bankerAddress,
             PlayerBook.getPlayerName(bankerAddress),
@@ -159,23 +148,40 @@ contract NumberGame is GameEvents {
         return (true);
     }
     
-    function getKeys()
+    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)
         public
         view
-        returns(bytes32[])
+        returns(uint256)
     {
-        Game storage currentGame = games_[totalGameCount_];
-        address playerAddress = msg.sender;
-        bytes32 userName = PlayerBook.getPlayerName(playerAddress);
-        return currentGame.userKeys[userName];
+        return games_[_gameRound].snapshotKeys[_key];
     }
 
-    function buyKeys(uint256[] _keys)
+    function snapshotKey(uint256 _gameRound ,uint256 _key)
+        public
+        payable
+        returns (bool) {
+        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
+        require(userName != "0", "user does not exist");
+        require(msg.value >= keyRevealFee_, "Not enough money");
+        Game storage currentGame = games_[_gameRound];
+        currentGame.snapshotKeys[_key] = currentGame.keys[_key];
+        return (true);
+    }
+    
+    function snapshotKeyTemp(uint256 _gameRound ,uint256 _key)
+        public
+        view
+        returns (uint256) {
+        Game storage currentGame = games_[_gameRound];
+        return (currentGame.snapshotKeys[_key]);
+    }
+
+    function buyKeys(uint256 _gameRound, uint256[] _keys)
       public
       payable
     {
         address playerAddress = msg.sender;
-        Game storage currentGame = games_[totalGameCount_];
+        Game storage currentGame = games_[_gameRound];
         bytes32 userName = PlayerBook.getPlayerName(playerAddress);
         uint256 costTotalKeys = keyPrice_.mul(_keys.length);
 
@@ -189,9 +195,24 @@ contract NumberGame is GameEvents {
         currentGame.totalAmount = currentGame.totalAmount.add(winningAmount);
         
         for (uint i = 0; i < _keys.length; i++) {
-            currentGame.userKeys[userName].push(hashHelper(_keys[i], rand_));
+            currentGame.userKeys[userName].push(_keys[i]);
+            uint256 keyCount = currentGame.keys[_keys[i]];
+
+            
+            if(keyCount == 0) {
+                // Create Key if is not exist
+                currentGame.keys[_keys[i]] = 1;
+            } else {
+                // Add Count if key exist
+                currentGame.keys[_keys[i]] = keyCount + 1;
+            }
+            
             playLottry();
         }
+    }
+
+    function random() public view returns (uint8) {
+        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
     }
     
     function playLottry()
