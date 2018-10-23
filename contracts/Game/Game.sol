@@ -92,7 +92,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0xf81D87132376DC852e198B3b02C4EFfD6b0D81f8;
+    address constant playbookContractAddress_ = 0x325116395e63E9B5cc82285BF01A68EBBff3050D;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
 
@@ -156,7 +156,7 @@ contract NumberGame is GameEvents {
         return games_[_gameRound].snapshotKeys[_key];
     }
 
-    function snapshotKey(uint256 _gameRound ,uint256 _key)
+    function snapshotKeys(uint256 _gameRound ,uint256[] _keys)
         public
         payable
         returns (bool) {
@@ -164,17 +164,12 @@ contract NumberGame is GameEvents {
         require(userName != "0", "user does not exist");
         require(msg.value >= keyRevealFee_, "Not enough money");
         Game storage currentGame = games_[_gameRound];
-        currentGame.snapshotKeys[_key] = currentGame.keys[_key];
+        for (uint i = 0; i < _keys.length; i++) {
+            currentGame.snapshotKeys[_keys[i]] = currentGame.keys[_keys[i]];
+        }
         return (true);
     }
     
-    function snapshotKeyTemp(uint256 _gameRound ,uint256 _key)
-        public
-        view
-        returns (uint256) {
-        Game storage currentGame = games_[_gameRound];
-        return (currentGame.snapshotKeys[_key]);
-    }
 
     function buyKeys(uint256 _gameRound, uint256[] _keys)
       public
@@ -187,9 +182,9 @@ contract NumberGame is GameEvents {
 
         require(msg.value > costTotalKeys, "Not enough money");
         
-        uint256 lotteryMoney = msg.value.sub(10);
-        uint256 winningAmount = msg.value.sub(10).mul(8);
-        uint256 potPassingIncomeAmount = msg.value.sub(10);
+        uint256 lotteryMoney = msg.value.div(10);
+        uint256 winningAmount = msg.value.div(10).mul(8);
+        uint256 potPassingIncomeAmount = msg.value.div(10);
         PlayerBook.deposit.value(potPassingIncomeAmount)();
         currentLottryPot_ = currentLottryPot_.add(lotteryMoney);
         currentGame.totalAmount = currentGame.totalAmount.add(winningAmount);

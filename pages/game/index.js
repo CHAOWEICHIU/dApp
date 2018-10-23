@@ -61,6 +61,14 @@ const shakingAnimation = keyframes`
   }
 `
 
+const NoticeWording = styled.div`
+  font-size: 14px;
+  color: #31708F;
+  min-height: 25px;
+  display: flex;
+  align-items: center;
+`
+
 const NumberLine = styled.div`
   height: 100px;
   display: flex;
@@ -86,7 +94,17 @@ const BuyButton = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  transition: opacity 0.5s ease-in-out;
+  ${props => (props.isDisabled
+    ? `
+      opacity: 0.3;
+      pointer-events: none;
+    `
+    : `
+      opacity: 1;
+      cursor: pointer;
+    `
+  )}
 `
 class Game extends React.PureComponent {
   static async getInitialProps({ req }) {
@@ -107,16 +125,19 @@ class Game extends React.PureComponent {
         winningAmount: '0',
       },
       tempNumber: '',
+      snapshotNumberMessage: '',
       numbers: [],
       keyPrice: '0',
+      snapshotKeyPrice: '0',
     }
   }
 
   componentDidMount() {
-    const { params: { id }, contractMethods: { getKeyPrice } } = this.props
+    const { params: { id }, contractMethods: { getKeyPrice, getSnapshotKeyPrice } } = this.props
     this.gamePooling = setInterval(this.fetchGameInfo(id), 1000)
     this.polling = setInterval(this.updateUserInfo, 2000)
     getKeyPrice().then(price => this.setState({ keyPrice: price }))
+    getSnapshotKeyPrice().then(price => this.setState({ snapshotKeyPrice: price }))
   }
 
   componentWillUnmount() {
@@ -158,13 +179,35 @@ class Game extends React.PureComponent {
   }
 
   buyKeys = (keys, address) => {
-    const { contractMethods } = this.props
-    contractMethods.buyKeys({ keys, address })
-      .then((res) => {
-        console.log(res);
-      })
+    const { contractMethods, params: { id } } = this.props
+    contractMethods.buyKeys({ keys, address, round: id })
+      .then(() => this.setState({ numbers: [] }))
       .catch((err) => {
-        console.log(err);
+        console.log(err)
+      })
+  }
+
+  snapshotKeys = (keys, address) => {
+    const { contractMethods, params: { id } } = this.props
+    contractMethods.snapshotKeys({ keys, address, round: id })
+      .then(() => this.setState({ numbers: [] }))
+      .catch((err) => {
+        console.log(err)
+      })
+  }
+
+  getKeysSnapshotCount = ({ key }) => {
+    if (!key) {
+      return this.setState({ snapshotNumberMessage: '' })
+    }
+    const { contractMethods, params: { id } } = this.props
+    return contractMethods.getKeysSnapshotCount({ round: id, key })
+      .then((count) => {
+        let msg = 'No One has bought it'
+        if (Number(count) >= 1) {
+          msg = `Number ${key} has been bought ${count} times`
+        }
+        this.setState({ snapshotNumberMessage: msg })
       })
   }
 
@@ -188,10 +231,13 @@ class Game extends React.PureComponent {
       numbers,
       user,
       keyPrice,
+      snapshotKeyPrice,
+      snapshotNumberMessage,
     } = this.state
     const isValidNumberInput = !(tempNumber === '')
     const countDownTimeDiff = moment(game.endTime).diff(moment())
     const gameIsOver = countDownTimeDiff < 0
+    const canBuyState = numbers.length > 0
 
     return (
       <Layout>
@@ -253,21 +299,45 @@ class Game extends React.PureComponent {
         </SectionWrapper>
         <SectionWrapper>
           <Section sectionTitle="Buy Key">
-            <SectionLabel>Price</SectionLabel>
+            <SectionLabel>Price to buy keys</SectionLabel>
             <SectionContent>
               {mul(keyPrice, numbers.length, '1.1')}
               {' '}
-              ETH
+              eth
             </SectionContent>
-            <br />
-            <BuyButton onClick={() => this.buyKeys(numbers, user.address)}>Buy</BuyButton>
+            <BuyButton
+              onClick={() => this.buyKeys(numbers, user.address)}
+              isDisabled={!canBuyState}
+            >
+              Buy Numbers
+            </BuyButton>
+
+            <SectionLabel>Price to snapshot keys</SectionLabel>
+            <SectionContent>
+              {mul(snapshotKeyPrice, numbers.length, '1.1')}
+              {' '}
+              eth
+            </SectionContent>
+            <BuyButton
+              onClick={() => this.snapshotKeys(numbers, user.address)}
+              isDisabled={!canBuyState}
+            >
+              Snapshot Numbers
+            </BuyButton>
             <Input
               label="Key"
               type="number"
               min="0"
-              onChange={e => this.updateFiled('tempNumber', e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value
+                this.updateFiled('tempNumber', newValue)
+                this.getKeysSnapshotCount({ key: newValue })
+              }}
               value={tempNumber}
             />
+            <NoticeWording>
+              {snapshotNumberMessage}
+            </NoticeWording>
             <StyledButton
               isDisabled={!isValidNumberInput}
               onClick={() => {
