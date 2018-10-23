@@ -29,8 +29,10 @@ const startCompile = (async () => {
       systemLogger({ message: `${key} complied` })
 
       fs.writeFileSync(
-        path.resolve(process.env.PWD, '.contracts', `${key.slice(1, key.length)}.js`),
+        path.resolve(process.env.PWD, 'contractsBuild', `${key.slice(1, key.length)}.js`),
         `
+const contractAddress = ''
+
 const contractInterface = ${value.interface}
 
 const contractInterfaceBytecode = '${value.bytecode}'
@@ -38,6 +40,7 @@ const contractInterfaceBytecode = '${value.bytecode}'
 module.exports = {
   contractInterface,
   contractInterfaceBytecode,
+  contractAddress,
 }
         `,
       )
