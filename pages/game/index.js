@@ -67,6 +67,8 @@ const NoticeWording = styled.div`
   min-height: 25px;
   display: flex;
   align-items: center;
+  white-space: pre-line;
+  min-height: 80px;
 `
 
 const NumberLine = styled.div`
@@ -202,17 +204,22 @@ class Game extends React.PureComponent {
     }
     const { contractMethods, params: { id } } = this.props
     return contractMethods.getKeysSnapshotCount({ round: id, key })
-      .then((count) => {
+      .then(({ timestamp, count }) => {
         let msg = 'No One has bought it'
         if (Number(count) >= 1) {
-          msg = `Number ${key} has been bought ${count} times`
+          const timeDiff = moment(timestamp).diff(moment())
+          msg = `
+${key} has been bought for ${count} times.
+
+Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
+
+`
         }
         this.setState({ snapshotNumberMessage: msg })
       })
   }
 
   fetchGameInfo = (id) => {
-    console.log('id', id);
     const { contractMethods: { getCurrentLotteryPotAmount, getGameById } } = this.props
     Promise.all([
       getCurrentLotteryPotAmount(),
@@ -346,6 +353,7 @@ class Game extends React.PureComponent {
                 this.setState({
                   tempNumber: '',
                   numbers: [tempNumber, ...numbers],
+                  snapshotNumberMessage: '',
                 })
               }}
             >
