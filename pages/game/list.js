@@ -85,6 +85,7 @@ class GameList extends React.PureComponent {
               },
             ),
           })
+          if (!currentUser.laff) return
           getUserInformationWithId(currentUser.laff)
             .then(data => this.setState({
               laffUser: Object.assign(
@@ -148,6 +149,7 @@ class GameList extends React.PureComponent {
     const activeGames = games.filter(game => game.status === 'active')
     const inActiveGames = games.filter(game => game.status === 'finished')
     const canStartGame = (user.name) && (activeGames.length === 0)
+    const hasRegistered = user.name
 
     return (
       <Layout>
@@ -158,18 +160,33 @@ class GameList extends React.PureComponent {
             <SectionLabel>Balance</SectionLabel>
             <SectionContent>{user.balance}</SectionContent>
           </Section>
-          <Section sectionTitle="User Book">
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{user.name}</SectionContent>
-            <SectionLabel>Claimable</SectionLabel>
-            <SectionContent>{user.claimable}</SectionContent>
-          </Section>
-          <Section sectionTitle="Laff User Book">
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{laffUser.name}</SectionContent>
-            <SectionLabel>Claimable</SectionLabel>
-            <SectionContent>{laffUser.claimable}</SectionContent>
-          </Section>
+          { !hasRegistered && (
+            <Section sectionTitle="User Name">
+              <SectionLabel>Register Info</SectionLabel>
+              <SectionContent>You need to register first before you start the game</SectionContent>
+              <Link prefetch href="/user/register">
+                <StyledButton>
+                  Register
+                </StyledButton>
+              </Link>
+            </Section>
+          ) }
+          { hasRegistered && (
+            <Section sectionTitle="User Book">
+              <SectionLabel>Name</SectionLabel>
+              <SectionContent>{user.name}</SectionContent>
+              <SectionLabel>Claimable</SectionLabel>
+              <SectionContent>{user.claimable}</SectionContent>
+            </Section>
+          ) }
+          { hasRegistered && (
+            <Section sectionTitle="Laff User Book">
+              <SectionLabel>Name</SectionLabel>
+              <SectionContent>{laffUser.name}</SectionContent>
+              <SectionLabel>Claimable</SectionLabel>
+              <SectionContent>{laffUser.claimable}</SectionContent>
+            </Section>
+          ) }
         </SectionWrapper>
         { canStartGame && (
           <SectionWrapper>

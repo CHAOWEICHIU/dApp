@@ -10,7 +10,7 @@ const playerBookJSON = require(path.resolve(process.env.PWD, 'build','contracts'
 module.exports = async (deployer) => {
   return deployer
     .deploy(PlayerBook)
-    .then(async (instance) => {
+    .then((instance) => {
       const gamePath = path.resolve(process.env.PWD, 'contracts', 'Game.sol')
       const data = fs.readFileSync(gamePath, 'utf8')
       const dataWithNewAddress = data.replace(new RegExp('(?<=address constant playbookContractAddress_ =)(.*)(?=;)'), ` ${instance.address}`)

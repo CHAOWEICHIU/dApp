@@ -1,101 +1,303 @@
 pragma solidity ^0.4.19;
 
-contract PlayerBookEvents {
-    event onNewUser
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that revert on error
+ */
+library SafeMath {
+
+  /**
+  * @dev Multiplies two numbers, reverts on overflow.
+  */
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+      // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+      // benefit is lost if 'b' is also tested.
+      // See: https://github.com/OpenZeppelin/openzeppelin-solidity/pull/522
+        if (a == 0) {
+            return 0;
+        }
+
+        uint256 c = a * b;
+        require(c / a == b);
+
+        return c;
+    }
+
+  /**
+  * @dev Integer division of two numbers truncating the quotient, reverts on division by zero.
+  */
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0); // Solidity only automatically asserts when dividing by 0
+        uint256 c = a / b;
+      // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+
+        return c;
+    }
+
+  /**
+  * @dev Subtracts two numbers, reverts on overflow (i.e. if subtrahend is greater than minuend).
+  */
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b <= a);
+        uint256 c = a - b;
+
+        return c;
+    }
+
+  /**
+  * @dev Adds two numbers, reverts on overflow.
+  */
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a);
+
+        return c;
+    }
+
+  /**
+  * @dev Divides two numbers and returns the remainder (unsigned integer modulo),
+  * reverts when dividing by zero.
+  */
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b != 0);
+        return a % b;
+    }
+}
+
+
+interface PlayerBookInterface {
+    function getPlayerName(address _addr) external view returns(bytes32);
+    function deposit() external payable returns(bool);
+}
+
+contract GameEvents {
+    event onLotteryWin
     (
-        address indexed UserAddress,
-        bytes32 indexed userName
+        address indexed playerAddress,
+        bytes32 indexed playerName,
+        uint256 timeStamp,
+        uint256 winningAmount
+    );
+    event onGameStart
+    (
+        address indexed bankerAddress,
+        bytes32 indexed bankerName,
+        uint256 timeStamp,
+        uint256 initialAmount,
+        uint256 round
     );
 }
 
-contract PlayerBook is PlayerBookEvents {
-    uint256 public totalPlayerCount = 0;                    // total players
-    uint256 public registrationFee_ = 10 finney;            // price to register a name
-    mapping (address => uint256) public pIDxAddr_;          // (addr => pID) returns player id by address
-    mapping (bytes32 => uint256) public pIDxName_;          // (name => pID) returns player id by name
-    mapping (uint256 => Player) public plyr_;               // (pID => data) player data
+
+contract NumberGame is GameEvents {
+    using SafeMath for uint256;
+    address constant playbookContractAddress_ = 0x8a9a728f64e58db7e790f099bddb3416ccc2eb77;
+
+    PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
+
+    uint256 public keyPrice_ = 0.5 ether;
+    uint256 public gameActivationFee_ = 1 ether;
+    uint256 public totalGameCount_ = 0;
+    uint256 public currentLottryPot_ = 0;
+    uint256 public keyRevealFee_ = 0.2 ether;
+    uint256 public snapshotWinnerFee_ = 5 ether;
+
+    mapping (uint256 => Game) public games_;
     
-    struct Player {
-        address addr;
-        bytes32 name;
-        uint256 laff;
-        uint256 claimable;
+    struct SnapshotKey {
+        uint256 timestamp;
+        uint256 count;
     }
     
-    constructor()
-        public
-    {
-        plyr_[0].addr = msg.sender;
-        plyr_[0].name = "wayne";
-        pIDxAddr_[msg.sender] = 0;
-        pIDxName_["wayne"] = 0;
+    struct Winner {
+        uint256 timestamp;
+        uint256 number;
+        bytes32 name;
     }
 
-    function getPlayerName(address _addr)
+    struct Game {
+        address bankerAddress;
+        uint256 totalAmount;
+        uint gameTotalTime;
+        uint startTime;
+        uint endTime;
+        Winner winner;
+        bytes32[] participantes;
+        mapping(uint256 => uint256) keys;
+        mapping(uint256 => SnapshotKey) snapshotKeys;
+        mapping(bytes32 => uint256[]) userKeys;
+    }
+
+    function startGame()
+      public
+      payable
+      returns (bool)
+    {
+        address bankerAddress = msg.sender;
+        uint256 depositAmount = msg.value;
+        require (depositAmount >= gameActivationFee_, "umm.....  you have to pay the name fee");
+        totalGameCount_++;
+        games_[totalGameCount_].bankerAddress = bankerAddress;
+
+
+        currentLottryPot_ = depositAmount.sub(10);
+        uint256 goOutAmount = depositAmount.sub(10);
+        PlayerBook.deposit.value(goOutAmount)();
+
+        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).mul(8);
+        
+        games_[totalGameCount_].gameTotalTime = 12 hours;
+        games_[totalGameCount_].startTime = now;
+        games_[totalGameCount_].endTime = now + 12 hours;
+
+        emit onGameStart(
+            bankerAddress,
+            PlayerBook.getPlayerName(bankerAddress),
+            now,
+            games_[totalGameCount_].totalAmount,
+            totalGameCount_
+        );
+        return (true);
+    }
+    
+    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)
         public
         view
-        returns(bytes32)
+        returns(
+            uint256,
+            uint256
+        )
     {
-        return plyr_[pIDxAddr_[_addr]].name;
-    }
-    
-    function registerPlayer(bytes32 _nameString, uint256 _affCode)
-        public
-        payable
-        returns (bool)
-    {
-        // make sure name fees paid
-        require (msg.value >= registrationFee_, "umm.....  you have to pay the name fee");
-        
-        // make sure the name has not been used
-        require(pIDxName_[_nameString] == 0, "sorry that names already taken");
-        
-        // set up config
-        address _addr = msg.sender;
-        totalPlayerCount ++;
-        
-        plyr_[totalPlayerCount].addr = _addr;
-        plyr_[totalPlayerCount].name = _nameString;
-        pIDxAddr_[_addr] = totalPlayerCount;
-        pIDxName_[_nameString] = totalPlayerCount;
-        plyr_[totalPlayerCount].laff = _affCode;
-
-        emit onNewUser(
-            _addr,
-            _nameString
+        return (
+            games_[_gameRound].snapshotKeys[_key].timestamp,
+            games_[_gameRound].snapshotKeys[_key].count
         );
-
-        return (true);
-        
     }
-    
-    function deposit()
+
+    function snapshotKeys(uint256 _gameRound ,uint256[] _keys)
         public
         payable
-        returns (bool)
     {
-        require(msg.value > 0, "need money");
-        uint256 affiliationAmount = msg.value / 10;
-        address _addr = msg.sender;
-        uint256 _playerId = pIDxAddr_[_addr];
-        uint256 _affiliatePlayerId = plyr_[_playerId].laff;
-        // if the person who send money has registered
-        if(_playerId != 0) {
-            plyr_[_affiliatePlayerId].claimable = affiliationAmount;
-            plyr_[_playerId].claimable = msg.value - affiliationAmount;
-            return true;
+        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
+        require(userName != "0", "user does not exist");
+        require(msg.value >= keyRevealFee_, "Not enough money");
+        Game storage currentGame = games_[_gameRound];
+        for (uint i = 0; i < _keys.length; i++) {
+            currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];
+            currentGame.snapshotKeys[_keys[i]].timestamp = block.timestamp;
         }
-        plyr_[0].claimable = msg.value;
-        return false;
     }
     
-    function claimMoney()
+    function currentWinner(uint256 _gameRound)
+        internal
+        view
+        returns (
+            bytes32,
+            uint256
+        )
+    {   
+        bytes32 tempWinner;
+        uint256 tempWinningNumber;
+        Game storage currentGame = games_[_gameRound];
+        bytes32[] memory participantes = currentGame.participantes;
+        for (uint i = 0; i < participantes.length; i++) {
+            uint256[] memory tempUserKeys = currentGame.userKeys[participantes[i]];
+            for(uint o = 0; o < tempUserKeys.length; o++) {
+                if(tempUserKeys[o] > tempWinningNumber) {
+                    tempWinningNumber = tempUserKeys[o];
+                    tempWinner = participantes[i];
+                    if(currentGame.keys[tempWinningNumber] > 1) {
+                        tempWinningNumber = 0;
+                        tempWinner = 0x0000000000000000000000000000000000000000000000000000000000000000;
+                    }
+                }
+            }
+        }
+        return (
+            tempWinner,
+            tempWinningNumber
+        );
+    }
+    
+    function snapshotWinner(uint256 _gameRound)
         public
+        payable
     {
-        address _addr = msg.sender;
-        Player storage player = plyr_[pIDxAddr_[_addr]];
-        require(player.claimable != 0, "you don't have money to claim");
-        player.claimable = 0;
-        _addr.transfer(player.claimable);
+        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
+        require(userName != "0", "user does not exist");
+        require(msg.value >= snapshotWinnerFee_, "Not enough money");
+
+        Game storage currentGame = games_[_gameRound];
+        
+        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
+        
+        currentGame.winner.name = winnerName;
+        currentGame.winner.number = winningNumber;
+        currentGame.winner.timestamp = block.timestamp;
+    }
+    
+    
+    
+
+    function buyKeys(uint256 _gameRound, uint256[] _keys)
+      public
+      payable
+    {
+        address playerAddress = msg.sender;
+        Game storage currentGame = games_[_gameRound];
+        bytes32 userName = PlayerBook.getPlayerName(playerAddress);
+        uint256 costTotalKeys = keyPrice_.mul(_keys.length);
+
+        require(msg.value > costTotalKeys, "Not enough money");
+        
+        uint256 lotteryMoney = msg.value.div(10);
+        uint256 winningAmount = msg.value.div(10).mul(8);
+        uint256 potPassingIncomeAmount = msg.value.div(10);
+        PlayerBook.deposit.value(potPassingIncomeAmount)();
+        currentLottryPot_ = currentLottryPot_.add(lotteryMoney);
+        currentGame.totalAmount = currentGame.totalAmount.add(winningAmount);
+        
+        
+        if(currentGame.userKeys[userName].length == 0) {
+            currentGame.participantes.push(userName);
+        }
+        
+        for (uint i = 0; i < _keys.length; i++) {
+            currentGame.userKeys[userName].push(_keys[i]);
+            uint256 keyCount = currentGame.keys[_keys[i]];
+
+            
+            if(keyCount == 0) {
+                // Create Key if is not exist
+                currentGame.keys[_keys[i]] = 1;
+            } else {
+                // Add Count if key exist
+                currentGame.keys[_keys[i]] = keyCount + 1;
+            }
+            
+            playLottry();
+        }
+    }
+
+    function random() public view returns (uint8) {
+        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
+    }
+    
+    function playLottry()
+        internal
+        returns(bool)
+    {
+        if(random() > 50) {
+            PlayerBook.deposit.value(currentLottryPot_)();
+            currentLottryPot_ = 0;
+            return (true);
+            emit onLotteryWin(
+                msg.sender,
+                PlayerBook.getPlayerName(msg.sender),
+                now,
+                currentLottryPot_
+            );
+        }
+        return (false);
     }
 }
