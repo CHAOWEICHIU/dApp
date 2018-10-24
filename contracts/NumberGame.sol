@@ -91,7 +91,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x8a9a728f64e58db7e790f099bddb3416ccc2eb77;
+    address constant playbookContractAddress_ = 0x2440eDDb85071164C69A3e46401C849CEfFE5d62;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
 
@@ -109,19 +109,16 @@ contract NumberGame is GameEvents {
         uint256 count;
     }
     
-    struct Winner {
-        uint256 timestamp;
-        uint256 number;
-        bytes32 name;
-    }
-
     struct Game {
         address bankerAddress;
         uint256 totalAmount;
         uint gameTotalTime;
         uint startTime;
         uint endTime;
-        Winner winner;
+        bytes32 winnerName;
+        address winnerAddress;
+        uint256 winnerNumber;
+        uint winnerTimestamp;
         bytes32[] participantes;
         mapping(uint256 => uint256) keys;
         mapping(uint256 => SnapshotKey) snapshotKeys;
@@ -131,7 +128,6 @@ contract NumberGame is GameEvents {
     function startGame()
       public
       payable
-      returns (bool)
     {
         address bankerAddress = msg.sender;
         uint256 depositAmount = msg.value;
@@ -140,11 +136,11 @@ contract NumberGame is GameEvents {
         games_[totalGameCount_].bankerAddress = bankerAddress;
 
 
-        currentLottryPot_ = depositAmount.sub(10);
-        uint256 goOutAmount = depositAmount.sub(10);
+        currentLottryPot_ = depositAmount.div(10);
+        uint256 goOutAmount = depositAmount.div(10);
         PlayerBook.deposit.value(goOutAmount)();
 
-        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.sub(10).mul(8);
+        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.div(10).mul(8);
         
         games_[totalGameCount_].gameTotalTime = 12 hours;
         games_[totalGameCount_].startTime = now;
@@ -157,7 +153,6 @@ contract NumberGame is GameEvents {
             games_[totalGameCount_].totalAmount,
             totalGameCount_
         );
-        return (true);
     }
     
     function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)
@@ -230,10 +225,11 @@ contract NumberGame is GameEvents {
         Game storage currentGame = games_[_gameRound];
         
         (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
+
         
-        currentGame.winner.name = winnerName;
-        currentGame.winner.number = winningNumber;
-        currentGame.winner.timestamp = block.timestamp;
+        currentGame.winnerName = winnerName;
+        currentGame.winnerNumber = winningNumber;
+        currentGame.winnerTimestamp = block.timestamp;
     }
     
     
