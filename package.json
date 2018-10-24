@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js"
+    "start": "NODE_ENV=production node server.js",
+    "build-contract": "truffle compile",
+    "migrate-contract-dev": "truffle migrate --network development --reset",
+    "migrate-contract-rinkeby": "truffle migrate --network rinkeby --reset"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +32,7 @@
     "recompose": "0.30.0",
     "solc": "0.4.25",
     "styled-components": "4.0.2",
+    "truffle": "4.1.14",
     "truffle-hdwallet-provider": "0.0.6",
     "victory": "30.5.0",
     "web3": "1.0.0-beta.36"
