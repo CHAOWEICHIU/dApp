@@ -1,6 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import PropTypes from 'prop-types'
+import Link from 'next/link'
 import withContracts from '../../lib/withContracts'
 import Section from '../../components/Section'
 import Layout from '../../components/Layout'
@@ -41,6 +42,7 @@ const StyledButton = styled.div`
     user-select: none;
   ` : `
     opacity: 1;
+    cursor: pointer;
   `)}
   
 `
@@ -157,6 +159,19 @@ class RegisterUserPage extends React.PureComponent {
             </Section>
           ) }
         </SectionWrapper>
+        { registered && (
+          <SectionWrapper>
+            <Section sectionTitle="Game">
+              <SectionLabel>Notice</SectionLabel>
+              <SectionContent>Ready for your first game?</SectionContent>
+              <Link prefetch href="/game/list">
+                <StyledButton>
+                  Game Center
+                </StyledButton>
+              </Link>
+            </Section>
+          </SectionWrapper>
+        ) }
         { registered && (
           <SectionWrapper>
             <Section sectionTitle="Laff Info">
