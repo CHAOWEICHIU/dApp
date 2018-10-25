@@ -91,7 +91,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x2440eDDb85071164C69A3e46401C849CEfFE5d62;
+    address constant playbookContractAddress_ = 0x0e0DcF636c60C2C4B29066506d69dfb8a726F4Fb;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
 
@@ -232,7 +232,23 @@ contract NumberGame is GameEvents {
         currentGame.winnerTimestamp = block.timestamp;
     }
     
-    
+    function getSnapshotWinner(uint256 _gameRound)
+        public
+        view
+        returns (
+            uint,
+            bytes32,
+            uint256
+        )
+    {
+        Game storage currentGame = games_[_gameRound];
+        return (
+            currentGame.winnerTimestamp,
+            currentGame.winnerName,
+            currentGame.winnerNumber    
+        );
+        
+    }    
     
 
     function buyKeys(uint256 _gameRound, uint256[] _keys)

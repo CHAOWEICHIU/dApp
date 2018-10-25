@@ -27,6 +27,7 @@ export const SectionContent = styled.div`
   color: white;
   font-size: 16px;
   margin-bottom: 10px;
+  min-height: 20px;
 `
 
 export const SectionWrapper = styled.div`

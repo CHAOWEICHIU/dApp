@@ -121,6 +121,7 @@ class Game extends React.PureComponent {
     this.numberGame = numberGame
     this.state = {
       user: { address: '', balance: '0' },
+      snapshotWinner: { name: '', number: '', timestamp: '' },
       banker: { address: '' },
       game: {
         lotteryAmount: '0',
@@ -131,24 +132,50 @@ class Game extends React.PureComponent {
       numbers: [],
       keyPrice: '0',
       snapshotKeyPrice: '0',
+      snapshotWinnerPrice: '0',
     }
   }
 
   componentDidMount() {
-    const { params: { id }, contractMethods: { getKeyPrice, getSnapshotKeyPrice } } = this.props
-    this.gamePooling = setInterval(() => this.fetchGameInfo(id), 1000)
+    const {
+      params: { id },
+      contractMethods: {
+        getKeyPrice,
+        getSnapshotKeyPrice,
+        getSnapshotWinnerFee,
+      },
+    } = this.props
+    this.gamePolling = setInterval(() => this.fetchGameInfo(id), 2000)
     this.polling = setInterval(this.updateUserInfo, 2000)
-    getKeyPrice().then(price => this.setState({ keyPrice: price }))
-    getSnapshotKeyPrice().then(price => this.setState({ snapshotKeyPrice: price }))
+    this.snapshotWinnerPolling = setInterval(this.updateSnapshotWinner, 2000)
+    Promise.all([
+      getKeyPrice(),
+      getSnapshotKeyPrice(),
+      getSnapshotWinnerFee(),
+    ])
+      .then(([keyPrice, snapshotKeyPrice, snapshotWinnerPrice]) => this.setState({
+        keyPrice,
+        snapshotKeyPrice,
+        snapshotWinnerPrice,
+      }))
   }
 
   componentWillUnmount() {
     if (this.polling) {
       clearInterval(this.polling)
     }
-    if (this.gamePooling) {
-      clearInterval(this.gamePooling)
+    if (this.gamePolling) {
+      clearInterval(this.gamePolling)
     }
+  }
+
+  updateSnapshotWinner = () => {
+    const { contractMethods, params: { id } } = this.props
+    contractMethods
+      .getSnapshotWinner({ round: id })
+      .then(({ name, number, timestamp }) => this.setState({
+        snapshotWinner: { name, number, timestamp },
+      }))
   }
 
   updateUserInfo = () => {
@@ -198,6 +225,18 @@ class Game extends React.PureComponent {
       })
   }
 
+  snapshotWinner = (address, price) => {
+    const { contractMethods, params: { id } } = this.props
+    contractMethods.snapshotWinner({ address, round: id, price })
+      .then((data) => {
+        console.log('snapshotWinner',data);
+        
+      })
+      .catch((err) => {
+        console.log(err)
+      })
+  }
+
   getKeysSnapshotCount = ({ key }) => {
     if (!key) {
       return this.setState({ snapshotNumberMessage: '' })
@@ -241,6 +280,8 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
       keyPrice,
       snapshotKeyPrice,
       snapshotNumberMessage,
+      snapshotWinner,
+      snapshotWinnerPrice,
     } = this.state
     const isValidNumberInput = !(tempNumber === '')
     const countDownTimeDiff = moment(game.endTime).diff(moment())
@@ -303,6 +344,30 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
               <EthImg src="/static/eth.svg" />
               <Color>To earn 0.0931 every number is bought</Color>
             </LineWrapper>
+          </Section>
+        </SectionWrapper>
+        <SectionWrapper>
+          <Section sectionTitle="Winner">
+            <SectionLabel>Snapshot Winner Name</SectionLabel>
+            <SectionContent>{snapshotWinner.name}</SectionContent>
+            <SectionLabel>Snapshot Time</SectionLabel>
+            <SectionContent>
+              {snapshotWinner.timestamp && moment
+                .duration(moment(snapshotWinner.timestamp).diff(moment()))
+                .humanize()
+              }
+            </SectionContent>
+            <SectionLabel>Winning Number</SectionLabel>
+            <SectionContent>{snapshotWinner.number}</SectionContent>
+            <SectionLabel>Snapshot Fee</SectionLabel>
+            <SectionContent>
+              {snapshotWinnerPrice}
+              {' '}
+              eth
+            </SectionContent>
+            <StyledButton onClick={() => this.snapshotWinner(user.address, snapshotWinnerPrice)}>
+              Snapshot Winner
+            </StyledButton>
           </Section>
         </SectionWrapper>
         <SectionWrapper>
