@@ -7,9 +7,11 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
+    "test": "NODE_ENV=test npm run truffle-test",
     "build-contract": "truffle compile",
     "migrate-contract-dev": "truffle migrate --network development --reset",
-    "migrate-contract-rinkeby": "truffle migrate --network rinkeby --reset"
+    "migrate-contract-rinkeby": "truffle migrate --network rinkeby --reset",
+    "truffle-test": "truffle test"
   },
   "keywords": [],
   "author": "",

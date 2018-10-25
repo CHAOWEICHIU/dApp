@@ -228,10 +228,7 @@ class Game extends React.PureComponent {
   snapshotWinner = (address, price) => {
     const { contractMethods, params: { id } } = this.props
     contractMethods.snapshotWinner({ address, round: id, price })
-      .then((data) => {
-        console.log('snapshotWinner',data);
-        
-      })
+      .then(() => {})
       .catch((err) => {
         console.log(err)
       })
