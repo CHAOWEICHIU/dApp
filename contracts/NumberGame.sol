@@ -62,8 +62,9 @@ library SafeMath {
         require(b != 0);
         return a % b;
     }
-}
 
+    
+}
 
 interface PlayerBookInterface {
     function getPlayerName(address _addr) external view returns(bytes32);
@@ -91,9 +92,22 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x0e0DcF636c60C2C4B29066506d69dfb8a726F4Fb;
+    address constant playbookContractAddress_ = 0x811128cf810016f805dad24c31AD19bC7537f8A1;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
+    
+    modifier isRegisteredUser
+    {
+        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
+        require(userName != "0", "user does not exist");
+        _;
+    }
+
+    modifier meetDepositRequirement(uint256 _fee)
+    {
+        require(msg.value >= _fee, "fee does not meet requirement");
+        _;
+    }
 
     uint256 public keyPrice_ = 0.5 ether;
     uint256 public gameActivationFee_ = 1 ether;
@@ -124,63 +138,57 @@ contract NumberGame is GameEvents {
         mapping(uint256 => SnapshotKey) snapshotKeys;
         mapping(bytes32 => uint256[]) userKeys;
     }
+    
+    // Internal Function
 
-    function startGame()
-      public
-      payable
+    function min(uint256[] data)
+        internal
+        pure
+        returns (uint256) 
     {
-        address bankerAddress = msg.sender;
-        uint256 depositAmount = msg.value;
-        require (depositAmount >= gameActivationFee_, "umm.....  you have to pay the name fee");
-        totalGameCount_++;
-        games_[totalGameCount_].bankerAddress = bankerAddress;
-
-
-        currentLottryPot_ = depositAmount.div(10);
-        uint256 goOutAmount = depositAmount.div(10);
-        PlayerBook.deposit.value(goOutAmount)();
-
-        games_[totalGameCount_].totalAmount = games_[totalGameCount_].totalAmount + depositAmount.div(10).mul(8);
-        
-        games_[totalGameCount_].gameTotalTime = 12 hours;
-        games_[totalGameCount_].startTime = now;
-        games_[totalGameCount_].endTime = now + 12 hours;
-
-        emit onGameStart(
-            bankerAddress,
-            PlayerBook.getPlayerName(bankerAddress),
-            now,
-            games_[totalGameCount_].totalAmount,
-            totalGameCount_
-        );
+        uint256 minimal = data[0];
+        for(uint256 i;i < data.length;i++){
+            if(data[i] < minimal){
+                minimal = data[i];
+            }
+        }
+        return minimal;
     }
     
-    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)
-        public
-        view
-        returns(
-            uint256,
-            uint256
-        )
+    function playLottry()
+        internal
+        returns(bool)
     {
-        return (
-            games_[_gameRound].snapshotKeys[_key].timestamp,
-            games_[_gameRound].snapshotKeys[_key].count
-        );
-    }
-
-    function snapshotKeys(uint256 _gameRound ,uint256[] _keys)
-        public
-        payable
-    {
-        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
-        require(userName != "0", "user does not exist");
-        require(msg.value >= keyRevealFee_, "Not enough money");
-        Game storage currentGame = games_[_gameRound];
-        for (uint i = 0; i < _keys.length; i++) {
-            currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];
-            currentGame.snapshotKeys[_keys[i]].timestamp = block.timestamp;
+        if(random() > 50) {
+            PlayerBook.deposit.value(currentLottryPot_)();
+            currentLottryPot_ = 0;
+            return (true);
+            emit onLotteryWin(
+                msg.sender,
+                PlayerBook.getPlayerName(msg.sender),
+                now,
+                currentLottryPot_
+            );
         }
+        return (false);
+    }
+    
+    function moneyDistribution(
+        uint256 _gameRound,
+        uint256 _amount
+    )
+        internal
+    {
+        uint256 depositAmount = _amount;
+        uint256 portionAmount = depositAmount.div(10);
+        
+        uint256 goOutAmount = portionAmount;
+        uint256 gameLotteryPotAmount = portionAmount;
+        uint256 gameWinningPotAmount = depositAmount.sub(portionAmount).sub(goOutAmount).sub(gameLotteryPotAmount);
+        
+        games_[_gameRound].totalAmount = games_[_gameRound].totalAmount + gameWinningPotAmount;
+        currentLottryPot_ = currentLottryPot_ + gameLotteryPotAmount;
+        PlayerBook.deposit.value(goOutAmount)();
     }
     
     function currentWinner(uint256 _gameRound)
@@ -198,13 +206,13 @@ contract NumberGame is GameEvents {
         for (uint i = 0; i < participantes.length; i++) {
             uint256[] memory tempUserKeys = currentGame.userKeys[participantes[i]];
             for(uint o = 0; o < tempUserKeys.length; o++) {
-                if(tempUserKeys[o] > tempWinningNumber) {
-                    tempWinningNumber = tempUserKeys[o];
+                if(tempWinningNumber == 0 && min(tempUserKeys) != 0 && currentGame.keys[min(tempUserKeys)] <= 1) {
+                    tempWinningNumber = min(tempUserKeys);
                     tempWinner = participantes[i];
-                    if(currentGame.keys[tempWinningNumber] > 1) {
-                        tempWinningNumber = 0;
-                        tempWinner = 0x0000000000000000000000000000000000000000000000000000000000000000;
-                    }
+                }
+                if(tempWinningNumber != 0 && min(tempUserKeys) != 0 && currentGame.keys[min(tempUserKeys)] <= 1 && tempWinningNumber > min(tempUserKeys)) {
+                    tempWinningNumber = min(tempUserKeys);
+                    tempWinner = participantes[i];
                 }
             }
         }
@@ -214,22 +222,38 @@ contract NumberGame is GameEvents {
         );
     }
     
-    function snapshotWinner(uint256 _gameRound)
+    function random() internal view returns (uint8) {
+        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
+    }
+    
+    // Read Only Function
+
+    function getCurrentFinishGameReward(uint256 _gameRound)
         public
-        payable
+        view
+        returns (
+            uint256
+        )
     {
-        bytes32 userName = PlayerBook.getPlayerName(msg.sender);
-        require(userName != "0", "user does not exist");
-        require(msg.value >= snapshotWinnerFee_, "Not enough money");
-
-        Game storage currentGame = games_[_gameRound];
+        Game memory targetGame = games_[_gameRound];
         
-        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
-
-        
-        currentGame.winnerName = winnerName;
-        currentGame.winnerNumber = winningNumber;
-        currentGame.winnerTimestamp = block.timestamp;
+        return (
+            targetGame.totalAmount.div(10)
+        );
+    }
+    
+    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)
+        public
+        view
+        returns(
+            uint256,
+            uint256
+        )
+    {
+        return (
+            games_[_gameRound].snapshotKeys[_key].timestamp,
+            games_[_gameRound].snapshotKeys[_key].count
+        );
     }
     
     function getSnapshotWinner(uint256 _gameRound)
@@ -247,20 +271,75 @@ contract NumberGame is GameEvents {
             currentGame.winnerName,
             currentGame.winnerNumber    
         );
-        
-    }    
+    }   
     
+    // Payable Function
 
+    function finishGame(uint256 _gameRound)
+        public
+        isRegisteredUser
+        payable
+    {
+        Game storage targetGame = games_[_gameRound];
+        address defaultAddress;
+        require(targetGame.endTime <= block.timestamp, "Game yet to be finished");
+        require(targetGame.winnerAddress != defaultAddress, "Winner has been claimed");
+        (uint256 rewardAmount) = getCurrentFinishGameReward(_gameRound);
+        PlayerBook.deposit.value(rewardAmount)();
+    }
+
+    function startGame()
+      public
+      isRegisteredUser
+      meetDepositRequirement(gameActivationFee_)
+      payable
+    {
+        address bankerAddress = msg.sender;
+        uint256 depositAmount = msg.value;
+
+        totalGameCount_++;
+        games_[totalGameCount_].bankerAddress = bankerAddress;
+    
+        moneyDistribution(totalGameCount_, depositAmount);
+        
+        games_[totalGameCount_].gameTotalTime = 12 hours;
+        games_[totalGameCount_].startTime = now;
+        games_[totalGameCount_].endTime = now + 12 hours;
+
+        emit onGameStart(
+            bankerAddress,
+            PlayerBook.getPlayerName(bankerAddress),
+            now,
+            games_[totalGameCount_].totalAmount,
+            totalGameCount_
+        );
+    }
+    
+    function snapshotKeys(uint256 _gameRound ,uint256[] _keys)
+        public
+        isRegisteredUser
+        meetDepositRequirement(keyRevealFee_.mul(_keys.length))
+        payable
+    {
+        Game storage currentGame = games_[_gameRound];
+        uint256 depositAmount = msg.value;
+        moneyDistribution(_gameRound, depositAmount);
+
+        for (uint i = 0; i < _keys.length; i++) {
+            currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];
+            currentGame.snapshotKeys[_keys[i]].timestamp = block.timestamp;
+        }
+    }
+    
     function buyKeys(uint256 _gameRound, uint256[] _keys)
       public
+      isRegisteredUser
+      meetDepositRequirement(keyPrice_.mul(_keys.length))
       payable
     {
         address playerAddress = msg.sender;
         Game storage currentGame = games_[_gameRound];
         bytes32 userName = PlayerBook.getPlayerName(playerAddress);
-        uint256 costTotalKeys = keyPrice_.mul(_keys.length);
-
-        require(msg.value > costTotalKeys, "Not enough money");
         
         uint256 lotteryMoney = msg.value.div(10);
         uint256 winningAmount = msg.value.div(10).mul(8);
@@ -290,26 +369,22 @@ contract NumberGame is GameEvents {
             playLottry();
         }
     }
+    
+    function snapshotWinner(uint256 _gameRound)
+        public
+        isRegisteredUser
+        meetDepositRequirement(snapshotWinnerFee_)
+        payable
+    {
+        Game storage currentGame = games_[_gameRound];
+        uint256 depositAmount = msg.value;
+        moneyDistribution(_gameRound, depositAmount);
 
-    function random() public view returns (uint8) {
-        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);
+        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
+
+        currentGame.winnerName = winnerName;
+        currentGame.winnerNumber = winningNumber;
+        currentGame.winnerTimestamp = block.timestamp;
     }
     
-    function playLottry()
-        internal
-        returns(bool)
-    {
-        if(random() > 50) {
-            PlayerBook.deposit.value(currentLottryPot_)();
-            currentLottryPot_ = 0;
-            return (true);
-            emit onLotteryWin(
-                msg.sender,
-                PlayerBook.getPlayerName(msg.sender),
-                now,
-                currentLottryPot_
-            );
-        }
-        return (false);
-    }
 }
