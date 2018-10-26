@@ -3,7 +3,6 @@ import styled, { keyframes } from 'styled-components'
 import Link from 'next/link'
 import Layout from '../components/Layout'
 
-
 const BlockChainWrapper = styled.div`
 display:flex;
 align-items:center;
@@ -103,7 +102,7 @@ const ProContent = styled.h3`
 margin:0;
 color:rgba(28, 54, 83, 0.6);
 font-size:15px;
-letter-spacing:2px;
+letter-spacing:1px;
 @media(max-width:768px){
   font-size:3.3vw;
   letter-spacing:1vw;
@@ -161,6 +160,7 @@ flex-direction:column;
 `
 const BoxContainer = styled.div`
 display:flex;
+margin-top: 60px;
 `
 const PurchaseButton = styled.a`
 display:flex;
@@ -225,24 +225,57 @@ const ETH = styled.img`
   }
 `
 
-const MainPage = () => (
-  <Layout>
-    <WrapperA>
-      <WordWrapper>
-        <ETH src="/static/eth.svg" />
-      </WordWrapper>
-    </WrapperA>
-    <WrapperB>
-      <SecondAreaWordWrapper>
-        <SecondAreaWord>Start Your First Scam</SecondAreaWord>
-        <SecondAreaWord>『 Coingra 』will handle it all</SecondAreaWord>
-        <SecondAreaWord>Let you focus on scamming people</SecondAreaWord>
-      </SecondAreaWordWrapper>
-      <BoxContainer style={{ marginTop: 80 }}>
-        {
+const Spacer = styled.div`
+width: 100%;
+height: 30px;
+`
+
+const Profit = 10000000
+
+class MainPage extends React.Component {
+  state = {
+    number: 0,
+  }
+
+  componentDidMount() {
+    this.startToIncreaseNumber()
+  }
+
+  startToIncreaseNumber = () => {
+    const interval = setInterval(() => {
+      const { number } = this.state
+      if (number < Profit) {
+        this.setState({ number: number + 3 })
+      } else {
+        clearInterval(interval)
+      }
+    }, 1)
+  }
+
+  render() {
+    const {
+      number,
+    } = this.state
+    return (
+      <Layout>
+        <WrapperA>
+          <WordWrapper>
+            <ETH src="/static/eth.svg" />
+          </WordWrapper>
+        </WrapperA>
+        <WrapperB>
+          <SecondAreaWordWrapper>
+            <SecondAreaWord>Virtual Casino</SecondAreaWord>
+            <Spacer />
+            <SecondAreaWord>『 CoinPa 』will handle all low level details</SecondAreaWord>
+            <SecondAreaWord>while you focusing on strategies</SecondAreaWord>
+            <SecondAreaWord>to run your virtual casino globally</SecondAreaWord>
+          </SecondAreaWordWrapper>
+          <BoxContainer>
+            {
           [
-            { title: 'Smart Contract', content: 'No need to deploy your own smart contract' },
-            { title: 'Dashboard', content: 'To know how much you money you have scammed' },
+            { title: 'Secure Smart Contract', content: 'Smart contract that proves to be secure, tested back engineers.' },
+            { title: 'Easy-To-Use Dashboard', content: 'Dashboard that can monitor your Casino anywhere/anytime.' },
           ].map(x => (
             <ProContainer key={`${x.title}_ProContainer`}>
               <ProWrapper>
@@ -252,26 +285,31 @@ const MainPage = () => (
             </ProContainer>
           ))
         }
-      </BoxContainer>
-    </WrapperB>
-    <WrapperD>
-      <BlockChainWrapper>
-        <BlockChainTitle>To be a pioneer in scammer era</BlockChainTitle>
-        <StoryWord style={{ color: 'rgb(155,155,155)' }}>
-          Are you still scammer but yet to use Blockchain technology for advancing your game?
-        </StoryWord>
-        <BlockChainMarketCap>
-          <div>Current Money Pool</div>
-          <div>$ 730,145,138,076</div>
-        </BlockChainMarketCap>
-      </BlockChainWrapper>
-    </WrapperD>
-    <WrapperC>
-      <Link prefetch href="/game/list">
-        <PurchaseButton>Ready?</PurchaseButton>
-      </Link>
-    </WrapperC>
-  </Layout>
-)
+          </BoxContainer>
+        </WrapperB>
+        <WrapperD>
+          <BlockChainWrapper>
+            <BlockChainTitle>To be a Pioneer</BlockChainTitle>
+            <StoryWord style={{ color: 'rgb(155,155,155)' }}>
+              Are you ready to take advantage of Blockchain?
+            </StoryWord>
+            <BlockChainMarketCap>
+              <div>Profit</div>
+              <div>
+              $
+                {number.toLocaleString()}
+              </div>
+            </BlockChainMarketCap>
+          </BlockChainWrapper>
+        </WrapperD>
+        <WrapperC>
+          <Link prefetch href="/game/list">
+            <PurchaseButton>Ready?</PurchaseButton>
+          </Link>
+        </WrapperC>
+      </Layout>
+    )
+  }
+}
 
 export default MainPage
