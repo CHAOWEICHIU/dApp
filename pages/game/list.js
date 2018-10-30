@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import PropTypes from 'prop-types'
 import Link from 'next/link'
 import find from 'lodash/find'
+import orderBy from 'lodash/orderBy'
 import withContracts from '../../lib/withContracts'
 import Section, { SectionWrapper, SectionLabel, SectionContent } from '../../components/Section'
 import Loader from '../../components/Loader'
@@ -242,18 +243,23 @@ class GameList extends React.PureComponent {
           ) }
         </SectionWrapper>
         <SectionWrapper>
-          {activeGames.length > 0 && activeGames.map(activeGame => (
-            <Section sectionTitle="Active Game" key={`${activeGame.id}-section`}>
-              <SectionLabel>Game Index</SectionLabel>
-              <SectionContent>{activeGame.id}</SectionContent>
-              <br />
-              <Link prefetch href={`/game/${activeGame.id}`}>
-                <StyledButton>
+          {activeGames.length > 0 && orderBy(activeGames.map(x => ({ ...x, num: Number(x.winningAmount) })), ['num'], ['desc'])
+            .map(activeGame => (
+              <Section sectionTitle="Active Game" key={`${activeGame.id}-section`}>
+                <SectionLabel>Game Index</SectionLabel>
+                <SectionContent>{activeGame.id}</SectionContent>
+                <SectionLabel>Current Winning Pot</SectionLabel>
+                <SectionContent>{activeGame.winningAmount}</SectionContent>
+                <SectionLabel>Banker</SectionLabel>
+                <SectionContent>{activeGame.banker.name}</SectionContent>
+                <br />
+                <Link prefetch href={`/game/${activeGame.id}`}>
+                  <StyledButton>
                     Go To Game
-                </StyledButton>
-              </Link>
-            </Section>
-          ))}
+                  </StyledButton>
+                </Link>
+              </Section>
+            ))}
         </SectionWrapper>
         {inActiveGames.length !== 0 && (
           <SectionWrapper>
