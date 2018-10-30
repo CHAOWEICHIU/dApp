@@ -1,4 +1,5 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 import styled from 'styled-components'
 import Link from 'next/link'
 
@@ -46,6 +47,7 @@ display:flex;
 align-items:center;
 justify-content:flex-start;
 height:100%;
+cursor: pointer;
 `
 const RightArea = styled.div`
 width:90%;
@@ -98,14 +100,16 @@ const WhiteWord = styled(YellowWord)`
 color:white;
 `
 
-export default props => (
+const Layout = ({ children }) => (
   <Background>
     <Header>
-      <LeftArea>
-        <CoinGranpa />
-        <WhiteWord>COIN</WhiteWord>
-        <YellowWord>GRANDPA</YellowWord>
-      </LeftArea>
+      <Link prefetch href="/">
+        <LeftArea>
+          <CoinGranpa />
+          <WhiteWord>COIN</WhiteWord>
+          <YellowWord>GRANDPA</YellowWord>
+        </LeftArea>
+      </Link>
       <RightArea>
         {
             Links.map(link => (
@@ -116,6 +120,12 @@ export default props => (
           }
       </RightArea>
     </Header>
-    {props.children}
+    {children}
   </Background>
 )
+
+Layout.propTypes = {
+  children: PropTypes.any, /* eslint-disable-line */
+}
+
+export default Layout
