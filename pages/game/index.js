@@ -7,6 +7,7 @@ import withContracts from '../../lib/withContracts'
 import Section, { SectionLabel, SectionContent, SectionWrapper } from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
+import Loader from '../../components/Loader'
 
 const LineWrapper = styled.div`
   display: flex;
@@ -41,7 +42,7 @@ const StyledButton = styled.div`
 
 const NumbersContainerWrapper = styled.div`
   width: 100%;
-  height: 500px;
+  height: 200px;
   overflow: scroll;
 `
 
@@ -133,6 +134,8 @@ class Game extends React.PureComponent {
       keyPrice: '0',
       snapshotKeyPrice: '0',
       snapshotWinnerPrice: '0',
+      loadingUser: true,
+      loadingGame: true,
     }
   }
 
@@ -184,7 +187,7 @@ class Game extends React.PureComponent {
       .then((address) => {
         getUserInformationWithAddress(address)
           .then((user) => {
-            this.setState({ user })
+            this.setState({ user, loadingUser: false })
           })
       })
   }
@@ -264,6 +267,7 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
       .then(([lotteryAmount, game]) => this.setState({
         banker: game.banker,
         game: Object.assign(game, { lotteryAmount }),
+        loadingGame: false,
       }))
   }
 
@@ -279,32 +283,24 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
       snapshotNumberMessage,
       snapshotWinner,
       snapshotWinnerPrice,
+      loadingGame,
+      loadingUser,
     } = this.state
     const isValidNumberInput = !(tempNumber === '')
     const countDownTimeDiff = moment(game.endTime).diff(moment())
     const gameIsOver = countDownTimeDiff < 0
     const canBuyState = numbers.length > 0
 
+    if (loadingGame || loadingUser) {
+      return (
+        <Layout>
+          <Loader />
+        </Layout>
+      )
+    }
+
     return (
       <Layout>
-        <SectionWrapper>
-          <Section sectionTitle="Banker Info">
-            <SectionLabel>Address</SectionLabel>
-            <SectionContent>{banker.address}</SectionContent>
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{banker.name}</SectionContent>
-          </Section>
-          <Section sectionTitle="User Info">
-            <SectionLabel>Address</SectionLabel>
-            <SectionContent>{user.address}</SectionContent>
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{user.name}</SectionContent>
-            <SectionLabel>Balance</SectionLabel>
-            <SectionContent>{user.balance}</SectionContent>
-            <SectionLabel>Claimable</SectionLabel>
-            <SectionContent>{user.claimable}</SectionContent>
-          </Section>
-        </SectionWrapper>
         <SectionWrapper>
           <Section sectionTitle="Game Time Info">
             <SectionLabel>Start</SectionLabel>
@@ -336,40 +332,13 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
               <Color>{game.lotteryAmount}</Color>
             </LineWrapper>
           </Section>
-          <Section sectionTitle="Passive Income">
-            <LineWrapper>
-              <EthImg src="/static/eth.svg" />
-              <Color>To earn 0.0931 every number is bought</Color>
-            </LineWrapper>
-          </Section>
         </SectionWrapper>
         <SectionWrapper>
-          <Section sectionTitle="Winner">
-            <SectionLabel>Snapshot Winner Name</SectionLabel>
-            <SectionContent>{snapshotWinner.name}</SectionContent>
-            <SectionLabel>Snapshot Time</SectionLabel>
-            <SectionContent>
-              {snapshotWinner.timestamp && moment
-                .duration(moment(snapshotWinner.timestamp).diff(moment()))
-                .humanize()
-              }
-            </SectionContent>
-            <SectionLabel>Winning Number</SectionLabel>
-            <SectionContent>{snapshotWinner.number}</SectionContent>
-            <SectionLabel>Snapshot Fee</SectionLabel>
-            <SectionContent>
-              {snapshotWinnerPrice}
-              {' '}
-              eth
-            </SectionContent>
-            <StyledButton onClick={() => this.snapshotWinner(user.address, snapshotWinnerPrice)}>
-              Snapshot Winner
-            </StyledButton>
-          </Section>
-        </SectionWrapper>
-        <SectionWrapper>
-          <Section sectionTitle="Buy Key">
-            <SectionLabel>Price to buy keys</SectionLabel>
+          <Section sectionTitle="Buy Number">
+            <SectionLabel>
+              Price to buy one number $
+              {keyPrice}
+            </SectionLabel>
             <SectionContent>
               {mul(keyPrice, numbers.length, '1.1')}
               {' '}
@@ -381,8 +350,10 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
             >
               Buy Numbers
             </BuyButton>
-
-            <SectionLabel>Price to snapshot keys</SectionLabel>
+            <SectionLabel>
+              Price to snapshot one number $
+              {snapshotKeyPrice}
+            </SectionLabel>
             <SectionContent>
               {mul(snapshotKeyPrice, numbers.length, '1.1')}
               {' '}
@@ -395,7 +366,7 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
               Snapshot Numbers
             </BuyButton>
             <Input
-              label="Key"
+              label="Number"
               type="number"
               min="0"
               onChange={(e) => {
@@ -437,6 +408,47 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
                   </NumbersContainer>
                 )
             }
+          </Section>
+          <Section sectionTitle="Snapshot Winner">
+            <SectionLabel>Snapshot Winner Name</SectionLabel>
+            <SectionContent>{snapshotWinner.name}</SectionContent>
+            <SectionLabel>Snapshot Time</SectionLabel>
+            <SectionContent>
+              {snapshotWinner.timestamp && moment
+                .duration(moment(snapshotWinner.timestamp).diff(moment()))
+                .humanize()
+              }
+            </SectionContent>
+            <SectionLabel>Winning Number</SectionLabel>
+            <SectionContent>{snapshotWinner.number}</SectionContent>
+            <SectionLabel>Snapshot Fee</SectionLabel>
+            <SectionContent>
+              {snapshotWinnerPrice}
+              {' '}
+              eth
+            </SectionContent>
+            <StyledButton onClick={() => this.snapshotWinner(user.address, snapshotWinnerPrice)}>
+              Snapshot Winner
+            </StyledButton>
+          </Section>
+        </SectionWrapper>
+
+        <SectionWrapper>
+          <Section sectionTitle="Banker Info">
+            <SectionLabel>Address</SectionLabel>
+            <SectionContent>{banker.address}</SectionContent>
+            <SectionLabel>Name</SectionLabel>
+            <SectionContent>{banker.name}</SectionContent>
+          </Section>
+          <Section sectionTitle="User Info">
+            <SectionLabel>Address</SectionLabel>
+            <SectionContent>{user.address}</SectionContent>
+            <SectionLabel>Name</SectionLabel>
+            <SectionContent>{user.name}</SectionContent>
+            <SectionLabel>Balance</SectionLabel>
+            <SectionContent>{user.balance}</SectionContent>
+            <SectionLabel>Claimable</SectionLabel>
+            <SectionContent>{user.claimable}</SectionContent>
           </Section>
         </SectionWrapper>
       </Layout>

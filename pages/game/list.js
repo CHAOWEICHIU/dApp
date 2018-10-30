@@ -252,6 +252,10 @@ class GameList extends React.PureComponent {
                 <SectionContent>{activeGame.winningAmount}</SectionContent>
                 <SectionLabel>Banker</SectionLabel>
                 <SectionContent>{activeGame.banker.name}</SectionContent>
+                <SectionLabel>Count Down</SectionLabel>
+                <SectionContent>
+                  {moment.utc(moment(activeGame.endTime).diff(moment())).format('HH:mm:ss')}
+                </SectionContent>
                 <br />
                 <Link prefetch href={`/game/${activeGame.id}`}>
                   <StyledButton>
