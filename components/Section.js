@@ -1,12 +1,29 @@
 import React from 'react'
 import PropTypes from 'prop-types'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+
+const fadeIn = keyframes`
+  0% {
+    opacity: 0.1;
+    transform: translateY(-80px);
+  }
+  70% {
+    opacity: 0.6;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`
 
 const SectionContainer = styled.div`
   width: 400px;
   border: 1px rgba(120,120,120, 0.7) solid;
   margin: 20px;
+  animation: ${() => fadeIn} 1s ease-in-out both;
 `
+
 const SectionTitleText = styled.div`
   color: rgb(119,136,153);
   background: rgba(6,9,14,0.95);

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import find from 'lodash/find'
 import withContracts from '../../lib/withContracts'
 import Section, { SectionWrapper, SectionLabel, SectionContent } from '../../components/Section'
+import Loader from '../../components/Loader'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
 import { Select, Option } from '../../components/Select'
@@ -39,6 +40,7 @@ const gameOptions = [
     rules: [
       'The person who purchase the number that has not bought more than twice',
       'If all numbers that were purchased are all purchased more than twice, banker will win',
+      'Integer Only',
     ],
   },
 ]
@@ -53,6 +55,8 @@ class GameList extends React.PureComponent {
     super(props)
     const { web3, contracts: { playerBook, numberGame } } = this.props
     this.state = {
+      loadingUser: true,
+      loadingGame: true,
       games: [],
       user: {
         address: '',
@@ -74,7 +78,6 @@ class GameList extends React.PureComponent {
     this.playerBook = playerBook
     this.numberGame = numberGame
   }
-
 
   componentDidMount() {
     const { contractMethods: { getGameActivationFee } } = this.props
@@ -132,7 +135,7 @@ class GameList extends React.PureComponent {
 
   getGames = () => {
     const { contractMethods: { getGames } } = this.props
-    getGames().then(games => this.setState({ games }))
+    getGames().then(games => this.setState({ games, loadingGame: false }))
   }
 
   updateUserInfo = () => {
@@ -142,6 +145,7 @@ class GameList extends React.PureComponent {
       .then(accAddress => getUserInformationWithAddress(accAddress))
       .then(info => this.setState({
         user: Object.assign({}, user, info),
+        loadingUser: false,
       }))
   }
 
@@ -165,13 +169,40 @@ class GameList extends React.PureComponent {
       initReward,
       minInitReward,
       selectedGameKeyName,
+      loadingUser,
+      loadingGame,
     } = this.state
 
     const activeGames = games.filter(game => game.status === 'active')
     const inActiveGames = games.filter(game => game.status === 'finished')
-    const canStartGame = (user.name) && (activeGames.length === 0)
+    const canStartGame = user.name
     const hasRegistered = user.name
     const selectedGame = find(gameOptions, { inputKey: selectedGameKeyName })
+
+    if (loadingUser || loadingGame) {
+      return (
+        <Layout>
+          <Loader />
+        </Layout>
+      )
+    }
+    if (!hasRegistered) {
+      return (
+        <Layout>
+          <SectionWrapper>
+            <Section sectionTitle="User Name">
+              <SectionLabel>Register Info</SectionLabel>
+              <SectionContent>You need to register first before you start the game</SectionContent>
+              <Link prefetch href="/user/register">
+                <StyledButton>
+                  Register
+                </StyledButton>
+              </Link>
+            </Section>
+          </SectionWrapper>
+        </Layout>
+      )
+    }
 
     return (
       <Layout>
@@ -210,55 +241,6 @@ class GameList extends React.PureComponent {
             </Section>
           ) }
         </SectionWrapper>
-        { canStartGame && (
-          <SectionWrapper>
-            <Section sectionTitle="Game Setting">
-              <Select>
-                {gameOptions.map(gameOption => (
-                  <Option
-                    key={gameOption.inputKey}
-                    value={gameOption.inputKey}
-                  >
-                    {gameOption.inputName}
-                  </Option>
-                ))}
-              </Select>
-              <List>
-                {selectedGame && selectedGame.rules.map(rule => (
-                  <ListItem key={rule}>
-                    {rule}
-                  </ListItem>
-                ))}
-              </List>
-              <Spacer />
-              <Input
-                isDisabled
-                type="text"
-                value="ETH"
-                label="Currency"
-              />
-              <Spacer />
-              <Input
-                isDisabled
-                disabled
-                type="text"
-                value={find(gameOptions, { inputKey: selectedGameKeyName }).inputName}
-                label="Game"
-              />
-              <Spacer />
-              <Input
-                type="number"
-                value={initReward}
-                label="Initial Pot Amount"
-                min={minInitReward}
-                onChange={e => this.updateFiled('initReward', e.target.value)}
-              />
-              <StyledButton onClick={() => this.startGame()}>
-              GO
-              </StyledButton>
-            </Section>
-          </SectionWrapper>
-        ) }
         <SectionWrapper>
           {activeGames.length > 0 && activeGames.map(activeGame => (
             <Section sectionTitle="Active Game" key={`${activeGame.id}-section`}>
@@ -297,6 +279,67 @@ class GameList extends React.PureComponent {
             ))}
           </SectionWrapper>
         )}
+        { canStartGame && (
+        <SectionWrapper>
+          <Section sectionTitle="Game Start Setting">
+            <Select>
+              {gameOptions.map(gameOption => (
+                <Option
+                  key={gameOption.inputKey}
+                  value={gameOption.inputKey}
+                >
+                  {gameOption.inputName}
+                </Option>
+              ))}
+            </Select>
+            <List>
+              {selectedGame && selectedGame.rules.map(rule => (
+                <ListItem key={rule}>
+                  {rule}
+                </ListItem>
+              ))}
+            </List>
+            <Spacer />
+            <Input
+              isDisabled
+              disabled
+              type="text"
+              value={find(gameOptions, { inputKey: selectedGameKeyName }).inputName}
+              label="Game"
+            />
+            <Spacer />
+            {
+              [
+                { value: 'ETH', label: 'Currency' },
+                { value: '5', label: 'Snapshot Winner' },
+                { value: '0.22', label: 'Snapshot Number' },
+                { value: '0.55', label: 'Buy Number' },
+              ]
+                .map(x => (
+                  <React.Fragment key={`${x.value}-${x.label}`}>
+                    <Input
+                      isDisabled
+                      type="text"
+                      value={x.value}
+                      label={x.label}
+                    />
+                    <Spacer />
+                  </React.Fragment>
+                ))
+            }
+            <Input
+              type="number"
+              value={initReward}
+              label="Initial Pot Amount"
+              min={minInitReward}
+              onChange={e => this.updateFiled('initReward', e.target.value)}
+            />
+            <StyledButton onClick={() => this.startGame()}>
+              GO
+            </StyledButton>
+          </Section>
+        </SectionWrapper>
+        ) }
       </Layout>
     )
   }
