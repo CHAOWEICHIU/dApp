@@ -1,5 +1,7 @@
 pragma solidity ^0.4.19;
 
+import "./SafeMath.sol";
+
 contract PlayerBookEvents {
     event onNewUser
     (
@@ -9,6 +11,8 @@ contract PlayerBookEvents {
 }
 
 contract PlayerBook is PlayerBookEvents {
+    using SafeMath for uint256;
+
     uint256 public totalPlayerCount = 0;                    // total players
     uint256 public registrationFee_ = 10 finney;            // price to register a name
     mapping (address => uint256) public pIDxAddr_;          // (addr => pID) returns player id by address
@@ -20,6 +24,12 @@ contract PlayerBook is PlayerBookEvents {
         bytes32 name;
         uint256 laff;
         uint256 claimable;
+    }
+
+    modifier meetDepositRequirement(uint256 _fee)
+    {
+        require(msg.value >= _fee, "fee does not meet requirement");
+        _;
     }
     
     constructor()
@@ -41,15 +51,12 @@ contract PlayerBook is PlayerBookEvents {
     
     function registerPlayer(bytes32 _nameString, uint256 _affCode)
         public
+        meetDepositRequirement(registrationFee_)
         payable
-        returns (bool)
     {
-        // make sure name fees paid
-        require (msg.value >= registrationFee_, "umm.....  you have to pay the name fee");
-        
         // make sure the name has not been used
         require(pIDxName_[_nameString] == 0, "sorry that names already taken");
-        
+
         // set up config
         address _addr = msg.sender;
         totalPlayerCount ++;
@@ -64,9 +71,6 @@ contract PlayerBook is PlayerBookEvents {
             _addr,
             _nameString
         );
-
-        return (true);
-        
     }
     
     function deposit()
@@ -74,28 +78,25 @@ contract PlayerBook is PlayerBookEvents {
         payable
         returns (bool)
     {
-        require(msg.value > 0, "need money");
-        uint256 affiliationAmount = msg.value / 10;
-        address _addr = msg.sender;
-        uint256 _playerId = pIDxAddr_[_addr];
-        uint256 _affiliatePlayerId = plyr_[_playerId].laff;
-        // if the person who send money has registered
-        if(_playerId != 0) {
-            plyr_[_affiliatePlayerId].claimable = affiliationAmount;
-            plyr_[_playerId].claimable = msg.value - affiliationAmount;
-            return true;
-        }
-        plyr_[0].claimable = msg.value;
-        return false;
+        uint256 depositAmount = msg.value;
+        address depositUserAddress = msg.sender;
+
+        uint256 affiliationAmount = depositAmount.div(10);
+        
+        uint256 playerId = pIDxAddr_[depositUserAddress];
+        uint256 affiliatePlayerId = plyr_[playerId].laff;
+
+        plyr_[affiliatePlayerId].claimable = plyr_[affiliatePlayerId].claimable.add(affiliationAmount);
+        plyr_[playerId].claimable = depositAmount.sub(affiliationAmount);
     }
     
     function claimMoney()
         public
     {
-        address _addr = msg.sender;
-        Player storage player = plyr_[pIDxAddr_[_addr]];
+        address user = msg.sender;
+        Player storage player = plyr_[pIDxAddr_[user]];
         require(player.claimable != 0, "you don't have money to claim");
+        user.transfer(player.claimable);
         player.claimable = 0;
-        _addr.transfer(player.claimable);
     }
 }
