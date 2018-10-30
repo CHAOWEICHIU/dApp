@@ -3,10 +3,13 @@ import moment from 'moment'
 import styled from 'styled-components'
 import PropTypes from 'prop-types'
 import Link from 'next/link'
+import find from 'lodash/find'
 import withContracts from '../../lib/withContracts'
 import Section, { SectionWrapper, SectionLabel, SectionContent } from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
+import { Select, Option } from '../../components/Select'
+import { List, ListItem } from '../../components/List'
 
 const StyledButton = styled.div`
   margin-top: 50px;
@@ -29,6 +32,22 @@ const StyledSection = styled(Section)`
   `}
 `
 
+const gameOptions = [
+  {
+    inputKey: 'guessing_number_game',
+    inputName: 'Number Guessing Game',
+    rules: [
+      'The person who purchase the number that has not bought more than twice',
+      'If all numbers that were purchased are all purchased more than twice, banker will win',
+    ],
+  },
+]
+
+const Spacer = styled.div`
+  width: 100%;
+  height: 40px;
+`
+
 class GameList extends React.PureComponent {
   constructor(props) {
     super(props)
@@ -49,6 +68,7 @@ class GameList extends React.PureComponent {
       },
       initReward: '',
       minInitReward: '',
+      selectedGameKeyName: gameOptions[0].inputKey,
     }
     this.web3 = web3
     this.playerBook = playerBook
@@ -144,12 +164,14 @@ class GameList extends React.PureComponent {
       laffUser,
       initReward,
       minInitReward,
+      selectedGameKeyName,
     } = this.state
 
     const activeGames = games.filter(game => game.status === 'active')
     const inActiveGames = games.filter(game => game.status === 'finished')
     const canStartGame = (user.name) && (activeGames.length === 0)
     const hasRegistered = user.name
+    const selectedGame = find(gameOptions, { inputKey: selectedGameKeyName })
 
     return (
       <Layout>
@@ -191,15 +213,43 @@ class GameList extends React.PureComponent {
         { canStartGame && (
           <SectionWrapper>
             <Section sectionTitle="Game Setting">
-              <select>
-                <option value="guessing_number_game">guessing number game</option>
-              </select>
-              <br />
-              <br />
+              <Select>
+                {gameOptions.map(gameOption => (
+                  <Option
+                    key={gameOption.inputKey}
+                    value={gameOption.inputKey}
+                  >
+                    {gameOption.inputName}
+                  </Option>
+                ))}
+              </Select>
+              <List>
+                {selectedGame && selectedGame.rules.map(rule => (
+                  <ListItem key={rule}>
+                    {rule}
+                  </ListItem>
+                ))}
+              </List>
+              <Spacer />
+              <Input
+                isDisabled
+                type="text"
+                value="ETH"
+                label="Currency"
+              />
+              <Spacer />
+              <Input
+                isDisabled
+                disabled
+                type="text"
+                value={find(gameOptions, { inputKey: selectedGameKeyName }).inputName}
+                label="Game"
+              />
+              <Spacer />
               <Input
                 type="number"
                 value={initReward}
-                label="Reward"
+                label="Initial Pot Amount"
                 min={minInitReward}
                 onChange={e => this.updateFiled('initReward', e.target.value)}
               />

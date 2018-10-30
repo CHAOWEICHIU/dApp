@@ -5,6 +5,7 @@ import PropTypes from 'prop-types'
 const StyledTextWrapper = styled.div`
   display: flex;
   align-items: flex-end;
+  opacity: ${props => (props.isDisabled ? 0.4 : 1)};
 `
 
 const StyledInput = styled.input`
@@ -24,17 +25,18 @@ const InputPadding = styled.div`
 `
 
 const StyledText = styled.div`
-  font-size: 30px;
+  font-size: 18px;
   color: white;
   margin-right: 10px;
   font-weight: 300;
+  width: 100px;
 `
 
-const Input = ({ label, ...props }) => (
-  <StyledTextWrapper>
+const Input = ({ label, isDisabled, ...props }) => (
+  <StyledTextWrapper isDisabled={isDisabled}>
     { label && (<StyledText>{label}</StyledText>) }
     <InputPadding hasLabel={label}>
-      <StyledInput {...props} />
+      <StyledInput {...props} disabled={isDisabled} />
     </InputPadding>
   </StyledTextWrapper>
 )
