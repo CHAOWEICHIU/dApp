@@ -74,18 +74,12 @@ class RegisterUserPage extends React.PureComponent {
       nameTaken: false,
       tempLaffId: '',
       laffIdExist: true,
-      userLoading: true,
+      loadingUser: true,
     }
   }
 
   componentDidMount() {
     this.polling = setInterval(this.updateUserInfo, 2000)
-  }
-
-  componentWillUnmount() {
-    if (this.polling) {
-      clearInterval(this.polling)
-    }
   }
 
   updateUserInfo = () => {
@@ -96,22 +90,21 @@ class RegisterUserPage extends React.PureComponent {
         getUserInformationWithId,
       },
     } = this.props
-    const { user, laff } = this.state
     getCurrentMetaAccount()
       .then(accAddress => getUserInformationWithAddress(accAddress))
       .then((userInfo) => {
         if (!userInfo.name) {
           return this.setState({
-            user: Object.assign({}, user, userInfo),
-            userLoading: false,
+            user: userInfo,
+            loadingUser: false,
           })
         }
         return getUserInformationWithId(userInfo.laff)
           .then((laffInfo) => {
             this.setState({
-              user: Object.assign({}, user, userInfo),
-              laff: Object.assign({}, laff, laffInfo),
-              userLoading: false,
+              user: userInfo,
+              laff: laffInfo,
+              loadingUser: false,
             })
           })
       })
@@ -137,7 +130,7 @@ class RegisterUserPage extends React.PureComponent {
       nameTaken,
       tempLaffId,
       laffIdExist,
-      userLoading,
+      loadingUser,
     } = this.state
     const {
       contractMethods: {
@@ -148,7 +141,7 @@ class RegisterUserPage extends React.PureComponent {
     const registered = user.name
     const validInputs = (!nameTaken && laffIdExist && tempName && tempLaffId)
 
-    if (userLoading) {
+    if (loadingUser) {
       return (
         <Layout>
           <Loader />

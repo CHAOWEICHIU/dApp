@@ -88,10 +88,9 @@ class GameList extends React.PureComponent {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    const { user, laffUser } = this.state
+    const { user } = this.state
     const {
       contractMethods: {
-        getUserInformationWithId,
         getUserInformationWithAddress,
       },
     } = this.props
@@ -109,18 +108,6 @@ class GameList extends React.PureComponent {
               },
             ),
           })
-          if (!currentUser.laff) return
-          getUserInformationWithId(currentUser.laff)
-            .then(data => this.setState({
-              laffUser: Object.assign(
-                {},
-                laffUser,
-                {
-                  claimable: data.claimable,
-                  name: data.name,
-                },
-              ),
-            }))
         })
     }
   }
@@ -140,14 +127,30 @@ class GameList extends React.PureComponent {
   }
 
   updateUserInfo = () => {
-    const { getCurrentMetaAccount, contractMethods: { getUserInformationWithAddress } } = this.props
-    const { user } = this.state
+    const {
+      getCurrentMetaAccount,
+      contractMethods: {
+        getUserInformationWithAddress,
+        getUserInformationWithId,
+      },
+    } = this.props
+
     getCurrentMetaAccount()
       .then(accAddress => getUserInformationWithAddress(accAddress))
-      .then(info => this.setState({
-        user: Object.assign({}, user, info),
-        loadingUser: false,
-      }))
+      .then((user) => {
+        if (!user.laff) {
+          this.setState({
+            user,
+            loadingUser: false,
+          })
+        }
+        getUserInformationWithId(user.laff)
+          .then(laffUser => this.setState({
+            user,
+            laffUser,
+            loadingUser: false,
+          }))
+      })
   }
 
   updateFiled = (key, value) => this.setState({ [key]: value })
