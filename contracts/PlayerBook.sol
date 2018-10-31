@@ -73,21 +73,25 @@ contract PlayerBook is PlayerBookEvents {
         );
     }
     
-    function deposit()
+    function deposit(address depositUserAddress)
         public
         payable
         returns (bool)
     {
+        address defaultAddress;
         uint256 depositAmount = msg.value;
-        address depositUserAddress = msg.sender;
+        if(depositUserAddress == defaultAddress) {
+            plyr_[0].claimable = plyr_[0].claimable.add(depositAmount);
+            return (false);
+        }
 
         uint256 affiliationAmount = depositAmount.div(10);
-        
         uint256 playerId = pIDxAddr_[depositUserAddress];
         uint256 affiliatePlayerId = plyr_[playerId].laff;
 
         plyr_[affiliatePlayerId].claimable = plyr_[affiliatePlayerId].claimable.add(affiliationAmount);
-        plyr_[playerId].claimable = depositAmount.sub(affiliationAmount);
+        plyr_[playerId].claimable = plyr_[playerId].claimable.add(depositAmount.sub(affiliationAmount));
+        return (true);
     }
     
     function claimMoney()

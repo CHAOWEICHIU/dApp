@@ -4,7 +4,7 @@ import "./SafeMath.sol";
 
 interface PlayerBookInterface {
     function getPlayerName(address _addr) external view returns(bytes32);
-    function deposit() external payable returns(bool);
+    function deposit(address _addr) external payable returns(bool);
 }
 
 contract GameEvents {
@@ -28,7 +28,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x2b07651F4dAe02599E3f3fb0cCD30880AcCE8a1c;
+    address constant playbookContractAddress_ = 0x7d7d7F2D5329Bf96Ac2Bcc906033c24D0c1502d1;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
     
@@ -124,14 +124,15 @@ contract NumberGame is GameEvents {
         internal
         returns(bool)
     {
+        address depositPerson = msg.sender;
         if(random() > 50) {
-            PlayerBook.deposit.value(currentLottryPot_)();
+            PlayerBook.deposit.value(currentLottryPot_)(depositPerson);
             currentLottryPot_ = 0;
             return (true);
             emit onLotteryWin(
-                msg.sender,
-                PlayerBook.getPlayerName(msg.sender),
-                now,
+                depositPerson,
+                PlayerBook.getPlayerName(depositPerson),
+                block.timestamp,
                 currentLottryPot_
             );
         }
@@ -140,7 +141,8 @@ contract NumberGame is GameEvents {
     
     function moneyDistribution(
         uint256 _gameRound,
-        uint256 _amount
+        uint256 _amount,
+        address _personAddress
     )
         internal
     {
@@ -149,11 +151,11 @@ contract NumberGame is GameEvents {
         
         uint256 goOutAmount = portionAmount;
         uint256 gameLotteryPotAmount = portionAmount;
-        uint256 gameWinningPotAmount = depositAmount.sub(portionAmount).sub(goOutAmount).sub(gameLotteryPotAmount);
+        uint256 gameWinningPotAmount = depositAmount.sub(goOutAmount).sub(gameLotteryPotAmount);
         
-        games_[_gameRound].totalAmount = games_[_gameRound].totalAmount + gameWinningPotAmount;
-        currentLottryPot_ = currentLottryPot_ + gameLotteryPotAmount;
-        PlayerBook.deposit.value(goOutAmount)();
+        games_[_gameRound].totalAmount = games_[_gameRound].totalAmount.add(gameWinningPotAmount);
+        currentLottryPot_ = currentLottryPot_.add(gameLotteryPotAmount);
+        PlayerBook.deposit.value(goOutAmount)(_personAddress);
     }
     
     function currentWinner(uint256 _gameRound)
@@ -251,7 +253,7 @@ contract NumberGame is GameEvents {
         require(targetGame.endTime <= block.timestamp, "Game yet to be finished");
         require(targetGame.winnerAddress != defaultAddress, "Winner has been claimed");
         (uint256 rewardAmount) = getCurrentFinishGameReward(_gameRound);
-        PlayerBook.deposit.value(rewardAmount)();
+        PlayerBook.deposit.value(rewardAmount)(targetGame.winnerAddress);
     }
 
     function startGame()
@@ -266,7 +268,11 @@ contract NumberGame is GameEvents {
         totalGameCount_++;
         games_[totalGameCount_].bankerAddress = bankerAddress;
     
-        moneyDistribution(totalGameCount_, depositAmount);
+        moneyDistribution(
+            totalGameCount_,
+            depositAmount,
+            bankerAddress
+        );
         
         games_[totalGameCount_].gameTotalTime = 12 hours;
         games_[totalGameCount_].startTime = now;
@@ -290,7 +296,11 @@ contract NumberGame is GameEvents {
     {
         Game storage currentGame = games_[_gameRound];
         uint256 depositAmount = msg.value;
-        moneyDistribution(_gameRound, depositAmount);
+        moneyDistribution(
+            _gameRound,
+            depositAmount,
+            currentGame.bankerAddress
+        );
 
         for (uint i = 0; i < _keys.length; i++) {
             currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];
@@ -306,16 +316,16 @@ contract NumberGame is GameEvents {
       payable
     {
         address playerAddress = msg.sender;
+        uint256 depositAmount = msg.value;
+
         Game storage currentGame = games_[_gameRound];
         bytes32 userName = PlayerBook.getPlayerName(playerAddress);
         
-        uint256 lotteryMoney = msg.value.div(10);
-        uint256 winningAmount = msg.value.div(10).mul(8);
-        uint256 potPassingIncomeAmount = msg.value.div(10);
-        PlayerBook.deposit.value(potPassingIncomeAmount)();
-        currentLottryPot_ = currentLottryPot_.add(lotteryMoney);
-        currentGame.totalAmount = currentGame.totalAmount.add(winningAmount);
-        
+        moneyDistribution(
+            _gameRound,
+            depositAmount,
+            currentGame.bankerAddress
+        );
         
         if(currentGame.userKeys[userName].length == 0) {
             currentGame.participantes.push(userName);
@@ -336,10 +346,12 @@ contract NumberGame is GameEvents {
     {
         Game storage currentGame = games_[_gameRound];
         uint256 depositAmount = msg.value;
-        moneyDistribution(_gameRound, depositAmount);
-
+        moneyDistribution(
+            _gameRound,
+            depositAmount,
+            currentGame.bankerAddress
+        );
         (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
-
         currentGame.winnerName = winnerName;
         currentGame.winnerNumber = winningNumber;
         currentGame.winnerTimestamp = block.timestamp;
