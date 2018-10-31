@@ -6,6 +6,7 @@ import withContracts from '../../lib/withContracts'
 import Section from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
+import Loader from '../../components/Loader'
 
 const SectionWrapper = styled.div`
   padding: 10px;
@@ -73,6 +74,7 @@ class RegisterUserPage extends React.PureComponent {
       nameTaken: false,
       tempLaffId: '',
       laffIdExist: true,
+      userLoading: true,
     }
   }
 
@@ -99,13 +101,17 @@ class RegisterUserPage extends React.PureComponent {
       .then(accAddress => getUserInformationWithAddress(accAddress))
       .then((userInfo) => {
         if (!userInfo.name) {
-          return this.setState({ user: Object.assign({}, user, userInfo) })
+          return this.setState({
+            user: Object.assign({}, user, userInfo),
+            userLoading: false,
+          })
         }
         return getUserInformationWithId(userInfo.laff)
           .then((laffInfo) => {
             this.setState({
               user: Object.assign({}, user, userInfo),
               laff: Object.assign({}, laff, laffInfo),
+              userLoading: false,
             })
           })
       })
@@ -131,6 +137,7 @@ class RegisterUserPage extends React.PureComponent {
       nameTaken,
       tempLaffId,
       laffIdExist,
+      userLoading,
     } = this.state
     const {
       contractMethods: {
@@ -140,6 +147,14 @@ class RegisterUserPage extends React.PureComponent {
     } = this.props
     const registered = user.name
     const validInputs = (!nameTaken && laffIdExist && tempName && tempLaffId)
+
+    if (userLoading) {
+      return (
+        <Layout>
+          <Loader />
+        </Layout>
+      )
+    }
 
     return (
       <Layout>
