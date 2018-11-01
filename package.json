@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "NODE_ENV=development node server.js",
+    "dev:watch": "NODE_ENV=development nodemon server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
     "test": "NODE_ENV=test npm run truffle-test",
@@ -54,6 +55,7 @@
     "eslint-plugin-import": "2.14.0",
     "eslint-plugin-jsx-a11y": "6.1.2",
     "eslint-plugin-react": "7.11.1",
-    "jest": "23.6.0"
+    "jest": "23.6.0",
+    "nodemon": "^1.18.5"
   }
 }
