@@ -44,7 +44,7 @@
   "deployedBytecode": "0x",
   "sourceMap": "",
   "deployedSourceMap": "",
-  "source": "pragma solidity ^0.4.19;\n\nimport \"./SafeMath.sol\";\n\ninterface PlayerBookInterface {\n    function getPlayerName(address _addr) external view returns(bytes32);\n    function deposit(address _addr) external payable returns(bool);\n}\n\ncontract GameEvents {\n    event onLotteryWin\n    (\n        address indexed playerAddress,\n        bytes32 indexed playerName,\n        uint256 timeStamp,\n        uint256 winningAmount\n    );\n    event onGameStart\n    (\n        address indexed bankerAddress,\n        bytes32 indexed bankerName,\n        uint256 timeStamp,\n        uint256 initialAmount,\n        uint256 round\n    );\n}\n\n\ncontract NumberGame is GameEvents {\n    using SafeMath for uint256;\n    address constant playbookContractAddress_ = 0x7d7d7F2D5329Bf96Ac2Bcc906033c24D0c1502d1;\n\n    PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);\n    \n    modifier isRegisteredUser\n    {\n        bytes32 userName = PlayerBook.getPlayerName(msg.sender);\n        require(userName != \"0\", \"user does not exist\");\n        _;\n    }\n\n    modifier meetDepositRequirement(uint256 _fee)\n    {\n        require(msg.value >= _fee, \"fee does not meet requirement\");\n        _;\n    }\n\n    modifier areIntegers(uint256[] _num)\n    {\n        for(uint256 i;i < _num.length;i++){\n            require(returnTrueIfIsInterger(_num[i]), \"number must be integer\");\n        }\n        _;\n    }\n\n    modifier isInteger(uint256 _num)\n    {\n        require(returnTrueIfIsInterger(_num), \"number must be integer\");\n        _;\n    }\n\n    uint256 public keyPrice_ = 0.5 ether;\n    uint256 public gameActivationFee_ = 1 ether;\n    uint256 public totalGameCount_ = 0;\n    uint256 public currentLottryPot_ = 0;\n    uint256 public keyRevealFee_ = 0.2 ether;\n    uint256 public snapshotWinnerFee_ = 5 ether;\n\n    mapping (uint256 => Game) public games_;\n    \n    struct SnapshotKey {\n        uint256 timestamp;\n        uint256 count;\n    }\n    \n    struct Game {\n        address bankerAddress;\n        uint256 totalAmount;\n        uint gameTotalTime;\n        uint startTime;\n        uint endTime;\n        bytes32 winnerName;\n        address winnerAddress;\n        uint256 winnerNumber;\n        uint winnerTimestamp;\n        bytes32[] participantes;\n        mapping(uint256 => uint256) keys;\n        mapping(uint256 => SnapshotKey) snapshotKeys;\n        mapping(bytes32 => uint256[]) userKeys;\n    }\n    \n    // Internal Function\n\n    function returnTrueIfIsInterger(uint256 num)\n        internal\n        pure\n        returns (bool)\n    {\n        // Todo\n        if(num != 0) {\n            return (true);\n        }\n        return (false);\n    }\n\n    function min(uint256[] data)\n        internal\n        pure\n        returns (uint256) \n    {\n        if(data.length == 0) {\n            return 0;\n        }\n        uint256 minimal = data[0];\n        for(uint256 i;i < data.length;i++){\n            if(data[i] < minimal){\n                minimal = data[i];\n            }\n        }\n        return minimal;\n    }\n    \n    function playLottry()\n        internal\n        returns(bool)\n    {\n        address depositPerson = msg.sender;\n        if(random() > 50) {\n            PlayerBook.deposit.value(currentLottryPot_)(depositPerson);\n            currentLottryPot_ = 0;\n            return (true);\n            emit onLotteryWin(\n                depositPerson,\n                PlayerBook.getPlayerName(depositPerson),\n                block.timestamp,\n                currentLottryPot_\n            );\n        }\n        return (false);\n    }\n    \n    function moneyDistribution(\n        uint256 _gameRound,\n        uint256 _amount,\n        address _personAddress\n    )\n        internal\n    {\n        uint256 depositAmount = _amount;\n        uint256 portionAmount = depositAmount.div(10);\n        \n        uint256 goOutAmount = portionAmount;\n        uint256 gameLotteryPotAmount = portionAmount;\n        uint256 gameWinningPotAmount = depositAmount.sub(goOutAmount).sub(gameLotteryPotAmount);\n        \n        games_[_gameRound].totalAmount = games_[_gameRound].totalAmount.add(gameWinningPotAmount);\n        currentLottryPot_ = currentLottryPot_.add(gameLotteryPotAmount);\n        PlayerBook.deposit.value(goOutAmount)(_personAddress);\n    }\n    \n    function currentWinner(uint256 _gameRound)\n        internal\n        view\n        returns (\n            bytes32,\n            uint256\n        )\n    {   \n        bytes32 tempWinner;\n        uint256 tempWinningNumber;\n        Game storage currentGame = games_[_gameRound];\n        bytes32[] memory participantes = currentGame.participantes;\n        for (uint i = 0; i < participantes.length; i++) {\n            uint256[] memory tempUserKeys = currentGame.userKeys[participantes[i]];\n            for(uint o = 0; o < tempUserKeys.length; o++) {\n                uint256 targetKey = tempUserKeys[o];\n                bool countIsOne = currentGame.keys[targetKey] == 1;\n                if(\n                    (tempWinningNumber == 0 && countIsOne == true) ||\n                    (tempWinningNumber == 0 && countIsOne == true && targetKey < tempWinningNumber)\n                ) {\n                    tempWinningNumber = targetKey;\n                    tempWinner = participantes[i];\n                }\n            }\n        }\n        return (\n            tempWinner,\n            tempWinningNumber\n        );\n    }\n    \n    function random() internal view returns (uint8) {\n        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);\n    }\n    \n    // Read Only Function\n\n    function getCurrentFinishGameReward(uint256 _gameRound)\n        public\n        view\n        returns (\n            uint256\n        )\n    {\n        Game memory targetGame = games_[_gameRound];\n        \n        return (\n            targetGame.totalAmount.div(10)\n        );\n    }\n    \n    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)\n        public\n        view\n        returns(\n            uint256,\n            uint256\n        )\n    {\n        return (\n            games_[_gameRound].snapshotKeys[_key].timestamp,\n            games_[_gameRound].snapshotKeys[_key].count\n        );\n    }\n    \n    function getSnapshotWinner(uint256 _gameRound)\n        public\n        view\n        returns (\n            uint,\n            bytes32,\n            uint256\n        )\n    {\n        Game storage currentGame = games_[_gameRound];\n        return (\n            currentGame.winnerTimestamp,\n            currentGame.winnerName,\n            currentGame.winnerNumber    \n        );\n    }   \n    \n    // Payable Function\n\n    function finishGame(uint256 _gameRound)\n        public\n        isRegisteredUser\n        payable\n    {\n        Game storage targetGame = games_[_gameRound];\n        address defaultAddress;\n        require(targetGame.endTime <= block.timestamp, \"Game yet to be finished\");\n        require(targetGame.winnerAddress != defaultAddress, \"Winner has been claimed\");\n        (uint256 rewardAmount) = getCurrentFinishGameReward(_gameRound);\n        PlayerBook.deposit.value(rewardAmount)(targetGame.winnerAddress);\n    }\n\n    function startGame()\n      public\n      isRegisteredUser\n      meetDepositRequirement(gameActivationFee_)\n      payable\n    {\n        address bankerAddress = msg.sender;\n        uint256 depositAmount = msg.value;\n\n        totalGameCount_++;\n        games_[totalGameCount_].bankerAddress = bankerAddress;\n    \n        moneyDistribution(\n            totalGameCount_,\n            depositAmount,\n            bankerAddress\n        );\n        \n        games_[totalGameCount_].gameTotalTime = 12 hours;\n        games_[totalGameCount_].startTime = now;\n        games_[totalGameCount_].endTime = now + 12 hours;\n\n        emit onGameStart(\n            bankerAddress,\n            PlayerBook.getPlayerName(bankerAddress),\n            now,\n            games_[totalGameCount_].totalAmount,\n            totalGameCount_\n        );\n    }\n    \n    function snapshotKeys(uint256 _gameRound, uint256[] _keys)\n        public\n        isRegisteredUser\n        areIntegers(_keys)\n        meetDepositRequirement(keyRevealFee_.mul(_keys.length))\n        payable\n    {\n        Game storage currentGame = games_[_gameRound];\n        uint256 depositAmount = msg.value;\n        moneyDistribution(_gameRound, depositAmount, currentGame.bankerAddress);\n\n        for (uint i = 0; i < _keys.length; i++) {\n            currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];\n            currentGame.snapshotKeys[_keys[i]].timestamp = block.timestamp;\n        }\n    }\n    \n    function buyKeys(uint256 _gameRound, uint256[] _keys)\n      public\n      isRegisteredUser\n      areIntegers(_keys)\n      meetDepositRequirement(keyPrice_.mul(_keys.length))\n      payable\n    {\n        address playerAddress = msg.sender;\n        uint256 depositAmount = msg.value;\n\n        Game storage currentGame = games_[_gameRound];\n        bytes32 userName = PlayerBook.getPlayerName(playerAddress);\n        \n        moneyDistribution(_gameRound, depositAmount, currentGame.bankerAddress);\n        \n        if(currentGame.userKeys[userName].length == 0) {\n            currentGame.participantes.push(userName);\n        }\n        \n        for (uint i = 0; i < _keys.length; i++) {\n            currentGame.userKeys[userName].push(_keys[i]);\n            currentGame.keys[_keys[i]]++;\n            playLottry();\n        }\n    }\n    \n    function snapshotWinner(uint256 _gameRound)\n        public\n        isRegisteredUser\n        meetDepositRequirement(snapshotWinnerFee_)\n        payable\n    {\n        Game storage currentGame = games_[_gameRound];\n        uint256 depositAmount = msg.value;\n        moneyDistribution(_gameRound, depositAmount, currentGame.bankerAddress);\n        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);\n        currentGame.winnerName = winnerName;\n        currentGame.winnerNumber = winningNumber;\n        currentGame.winnerTimestamp = block.timestamp;\n    }\n    \n}\n",
+  "source": "pragma solidity ^0.4.19;\n\nimport \"./SafeMath.sol\";\n\ninterface PlayerBookInterface {\n    function getPlayerName(address _addr) external view returns(bytes32);\n    function deposit(address _addr) external payable returns(bool);\n}\n\ncontract GameEvents {\n    event onLotteryWin\n    (\n        address indexed playerAddress,\n        bytes32 indexed playerName,\n        uint256 timeStamp,\n        uint256 winningAmount\n    );\n    event onGameStart\n    (\n        address indexed bankerAddress,\n        bytes32 indexed bankerName,\n        uint256 timeStamp,\n        uint256 initialAmount,\n        uint256 round\n    );\n}\n\n\ncontract NumberGame is GameEvents {\n    using SafeMath for uint256;\n    address constant playbookContractAddress_ = 0xc4c017657877F1d64f8B07A42d89598757EAe73e;\n\n    PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);\n    \n    modifier isRegisteredUser\n    {\n        bytes32 userName = PlayerBook.getPlayerName(msg.sender);\n        require(userName != \"0\", \"user does not exist\");\n        _;\n    }\n\n    modifier meetDepositRequirement(uint256 _fee)\n    {\n        require(msg.value >= _fee, \"fee does not meet requirement\");\n        _;\n    }\n\n    modifier areIntegers(uint256[] _num)\n    {\n        for(uint256 i;i < _num.length;i++){\n            require(returnTrueIfIsInterger(_num[i]), \"number must be integer\");\n        }\n        _;\n    }\n\n    modifier isInteger(uint256 _num)\n    {\n        require(returnTrueIfIsInterger(_num), \"number must be integer\");\n        _;\n    }\n\n    uint256 public keyPrice_ = 0.5 ether;\n    uint256 public gameActivationFee_ = 1 ether;\n    uint256 public totalGameCount_ = 0;\n    uint256 public currentLottryPot_ = 0;\n    uint256 public keyRevealFee_ = 0.2 ether;\n    uint256 public snapshotWinnerFee_ = 5 ether;\n\n    mapping (uint256 => Game) public games_;\n    \n    struct SnapshotKey {\n        uint256 timestamp;\n        uint256 count;\n    }\n    \n    struct Game {\n        address bankerAddress;\n        uint256 totalAmount;\n        uint gameTotalTime;\n        uint startTime;\n        uint endTime;\n        bytes32 winnerName;\n        address winnerAddress;\n        uint256 winnerNumber;\n        uint winnerTimestamp;\n        bytes32[] participantes;\n        mapping(uint256 => uint256) keys;\n        mapping(uint256 => SnapshotKey) snapshotKeys;\n        mapping(bytes32 => uint256[]) userKeys;\n    }\n    \n    // Internal Function\n\n    function returnTrueIfIsInterger(uint256 num)\n        internal\n        pure\n        returns (bool)\n    {\n        // Todo\n        if(num != 0) {\n            return (true);\n        }\n        return (false);\n    }\n\n    function min(uint256[] data)\n        internal\n        pure\n        returns (uint256) \n    {\n        if(data.length == 0) {\n            return 0;\n        }\n        uint256 minimal = data[0];\n        for(uint256 i;i < data.length;i++){\n            if(data[i] < minimal){\n                minimal = data[i];\n            }\n        }\n        return minimal;\n    }\n    \n    function playLottry()\n        internal\n        returns(bool)\n    {\n        address depositPerson = msg.sender;\n        if(random() > 50) {\n            PlayerBook.deposit.value(currentLottryPot_)(depositPerson);\n            currentLottryPot_ = 0;\n            return (true);\n            emit onLotteryWin(\n                depositPerson,\n                PlayerBook.getPlayerName(depositPerson),\n                block.timestamp,\n                currentLottryPot_\n            );\n        }\n        return (false);\n    }\n    \n    function moneyDistribution(\n        uint256 _gameRound,\n        uint256 _amount,\n        address _personAddress\n    )\n        internal\n    {\n        uint256 depositAmount = _amount;\n        uint256 portionAmount = depositAmount.div(10);\n        \n        uint256 goOutAmount = portionAmount;\n        uint256 gameLotteryPotAmount = portionAmount;\n        uint256 gameWinningPotAmount = depositAmount.sub(goOutAmount).sub(gameLotteryPotAmount);\n        \n        games_[_gameRound].totalAmount = games_[_gameRound].totalAmount.add(gameWinningPotAmount);\n        currentLottryPot_ = currentLottryPot_.add(gameLotteryPotAmount);\n        PlayerBook.deposit.value(goOutAmount)(_personAddress);\n    }\n    \n    function currentWinner(uint256 _gameRound)\n        internal\n        view\n        returns (\n            bytes32,\n            uint256\n        )\n    {   \n        bytes32 tempWinner;\n        uint256 tempWinningNumber;\n        Game storage currentGame = games_[_gameRound];\n        bytes32[] memory participantes = currentGame.participantes;\n        for (uint i = 0; i < participantes.length; i++) {\n            uint256[] memory tempUserKeys = currentGame.userKeys[participantes[i]];\n            for(uint o = 0; o < tempUserKeys.length; o++) {\n                uint256 targetKey = tempUserKeys[o];\n                bool countIsOne = currentGame.keys[targetKey] == 1;\n                if(\n                    (tempWinningNumber == 0 && countIsOne == true) ||\n                    (tempWinningNumber == 0 && countIsOne == true && targetKey < tempWinningNumber)\n                ) {\n                    tempWinningNumber = targetKey;\n                    tempWinner = participantes[i];\n                }\n            }\n        }\n        return (\n            tempWinner,\n            tempWinningNumber\n        );\n    }\n    \n    function random() internal view returns (uint8) {\n        return uint8(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)))%100);\n    }\n    \n    // Read Only Function\n\n    function getCurrentFinishGameReward(uint256 _gameRound)\n        public\n        view\n        returns (\n            uint256\n        )\n    {\n        Game memory targetGame = games_[_gameRound];\n        \n        return (\n            targetGame.totalAmount.div(10)\n        );\n    }\n    \n    function getKeysSnapshotCount(uint256 _gameRound, uint256 _key)\n        public\n        view\n        returns(\n            uint256,\n            uint256\n        )\n    {\n        return (\n            games_[_gameRound].snapshotKeys[_key].timestamp,\n            games_[_gameRound].snapshotKeys[_key].count\n        );\n    }\n    \n    function getSnapshotWinner(uint256 _gameRound)\n        public\n        view\n        returns (\n            uint,\n            bytes32,\n            uint256\n        )\n    {\n        Game storage currentGame = games_[_gameRound];\n        return (\n            currentGame.winnerTimestamp,\n            currentGame.winnerName,\n            currentGame.winnerNumber    \n        );\n    }   \n    \n    // Payable Function\n\n    function finishGame(uint256 _gameRound)\n        public\n        isRegisteredUser\n        payable\n    {\n        Game storage targetGame = games_[_gameRound];\n        address defaultAddress;\n        require(targetGame.endTime <= block.timestamp, \"Game yet to be finished\");\n        require(targetGame.winnerAddress != defaultAddress, \"Winner has been claimed\");\n        (uint256 rewardAmount) = getCurrentFinishGameReward(_gameRound);\n        PlayerBook.deposit.value(rewardAmount)(targetGame.winnerAddress);\n    }\n\n    function startGame()\n      public\n      isRegisteredUser\n      meetDepositRequirement(gameActivationFee_)\n      payable\n    {\n        address bankerAddress = msg.sender;\n        uint256 depositAmount = msg.value;\n\n        totalGameCount_++;\n        games_[totalGameCount_].bankerAddress = bankerAddress;\n    \n        moneyDistribution(\n            totalGameCount_,\n            depositAmount,\n            bankerAddress\n        );\n        \n        games_[totalGameCount_].gameTotalTime = 12 hours;\n        games_[totalGameCount_].startTime = now;\n        games_[totalGameCount_].endTime = now + 12 hours;\n\n        emit onGameStart(\n            bankerAddress,\n            PlayerBook.getPlayerName(bankerAddress),\n            now,\n            games_[totalGameCount_].totalAmount,\n            totalGameCount_\n        );\n    }\n    \n    function snapshotKeys(uint256 _gameRound, uint256[] _keys)\n        public\n        isRegisteredUser\n        areIntegers(_keys)\n        meetDepositRequirement(keyRevealFee_.mul(_keys.length))\n        payable\n    {\n        Game storage currentGame = games_[_gameRound];\n        uint256 depositAmount = msg.value;\n        moneyDistribution(\n            _gameRound,\n            depositAmount,\n            currentGame.bankerAddress\n        );\n\n        for (uint i = 0; i < _keys.length; i++) {\n            currentGame.snapshotKeys[_keys[i]].count = currentGame.keys[_keys[i]];\n            currentGame.snapshotKeys[_keys[i]].timestamp = block.timestamp;\n        }\n    }\n    \n    function buyKeys(uint256 _gameRound, uint256[] _keys)\n      public\n      isRegisteredUser\n      areIntegers(_keys)\n      meetDepositRequirement(keyPrice_.mul(_keys.length))\n      payable\n    {\n        address playerAddress = msg.sender;\n        uint256 depositAmount = msg.value;\n\n        Game storage currentGame = games_[_gameRound];\n        bytes32 userName = PlayerBook.getPlayerName(playerAddress);\n        \n        moneyDistribution(\n            _gameRound,\n            depositAmount,\n            currentGame.bankerAddress\n        );\n        \n        if(currentGame.userKeys[userName].length == 0) {\n            currentGame.participantes.push(userName);\n        }\n        \n        for (uint i = 0; i < _keys.length; i++) {\n            currentGame.userKeys[userName].push(_keys[i]);\n            currentGame.keys[_keys[i]]++;\n            playLottry();\n        }\n    }\n    \n    function snapshotWinner(uint256 _gameRound)\n        public\n        isRegisteredUser\n        meetDepositRequirement(snapshotWinnerFee_)\n        payable\n    {\n        Game storage currentGame = games_[_gameRound];\n        uint256 depositAmount = msg.value;\n        moneyDistribution(\n            _gameRound,\n            depositAmount,\n            currentGame.bankerAddress\n        );\n        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);\n        currentGame.winnerName = winnerName;\n        currentGame.winnerNumber = winningNumber;\n        currentGame.winnerTimestamp = block.timestamp;\n    }\n    \n}\n",
   "sourcePath": "/Users/waynechiu/Desktop/dApp/contracts/NumberGame.sol",
   "ast": {
     "absolutePath": "/Users/waynechiu/Desktop/dApp/contracts/NumberGame.sol",
@@ -644,7 +644,7 @@
             },
             "value": {
               "argumentTypes": null,
-              "hexValue": "307837643764374632443533323942663936416332426363393036303333633234443063313530326431",
+              "hexValue": "307863346330313736353738373746316436346638423037413432643839353938373537454165373365",
               "id": 47,
               "isConstant": false,
               "isLValue": false,
@@ -658,7 +658,7 @@
                 "typeIdentifier": "t_address",
                 "typeString": "address"
               },
-              "value": "0x7d7d7F2D5329Bf96Ac2Bcc906033c24D0c1502d1"
+              "value": "0xc4c017657877F1d64f8B07A42d89598757EAe73e"
             },
             "visibility": "internal"
           },
@@ -9358,7 +9358,7 @@
             "body": {
               "id": 792,
               "nodeType": "Block",
-              "src": "8115:406:0",
+              "src": "8115:452:0",
               "statements": [
                 {
                   "assignments": [
@@ -9514,7 +9514,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 715,
-                        "src": "8241:10:0",
+                        "src": "8254:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -9527,7 +9527,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 740,
-                        "src": "8253:13:0",
+                        "src": "8278:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -9542,7 +9542,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 734,
-                          "src": "8268:11:0",
+                          "src": "8305:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -9556,7 +9556,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "8268:25:0",
+                        "src": "8305:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -9597,7 +9597,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8223:71:0",
+                    "src": "8223:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -9605,13 +9605,13 @@
                   },
                   "id": 750,
                   "nodeType": "ExpressionStatement",
-                  "src": "8223:71:0"
+                  "src": "8223:117:0"
                 },
                 {
                   "body": {
                     "id": 790,
                     "nodeType": "Block",
-                    "src": "8345:170:0",
+                    "src": "8391:170:0",
                     "statements": [
                       {
                         "expression": {
@@ -9634,7 +9634,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 734,
-                                  "src": "8359:11:0",
+                                  "src": "8405:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -9648,7 +9648,7 @@
                                 "memberName": "snapshotKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 183,
-                                "src": "8359:24:0",
+                                "src": "8405:24:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_SnapshotKey_$154_storage_$",
                                   "typeString": "mapping(uint256 => struct NumberGame.SnapshotKey storage ref)"
@@ -9664,7 +9664,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 718,
-                                  "src": "8384:5:0",
+                                  "src": "8430:5:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                     "typeString": "uint256[] memory"
@@ -9678,7 +9678,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 752,
-                                  "src": "8390:1:0",
+                                  "src": "8436:1:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_uint256",
                                     "typeString": "uint256"
@@ -9689,7 +9689,7 @@
                                 "isPure": false,
                                 "lValueRequested": false,
                                 "nodeType": "IndexAccess",
-                                "src": "8384:8:0",
+                                "src": "8430:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -9700,7 +9700,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8359:34:0",
+                              "src": "8405:34:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_struct$_SnapshotKey_$154_storage",
                                 "typeString": "struct NumberGame.SnapshotKey storage ref"
@@ -9714,7 +9714,7 @@
                             "memberName": "count",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": 153,
-                            "src": "8359:40:0",
+                            "src": "8405:40:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -9733,7 +9733,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 734,
-                                "src": "8402:11:0",
+                                "src": "8448:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -9747,7 +9747,7 @@
                               "memberName": "keys",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 179,
-                              "src": "8402:16:0",
+                              "src": "8448:16:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_uint256_$_t_uint256_$",
                                 "typeString": "mapping(uint256 => uint256)"
@@ -9763,7 +9763,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 718,
-                                "src": "8419:5:0",
+                                "src": "8465:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -9777,7 +9777,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 752,
-                                "src": "8425:1:0",
+                                "src": "8471:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -9788,7 +9788,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8419:8:0",
+                              "src": "8465:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -9799,13 +9799,13 @@
                             "isPure": false,
                             "lValueRequested": false,
                             "nodeType": "IndexAccess",
-                            "src": "8402:26:0",
+                            "src": "8448:26:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
                             }
                           },
-                          "src": "8359:69:0",
+                          "src": "8405:69:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -9813,7 +9813,7 @@
                         },
                         "id": 777,
                         "nodeType": "ExpressionStatement",
-                        "src": "8359:69:0"
+                        "src": "8405:69:0"
                       },
                       {
                         "expression": {
@@ -9836,7 +9836,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 734,
-                                  "src": "8442:11:0",
+                                  "src": "8488:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -9850,7 +9850,7 @@
                                 "memberName": "snapshotKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 183,
-                                "src": "8442:24:0",
+                                "src": "8488:24:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_SnapshotKey_$154_storage_$",
                                   "typeString": "mapping(uint256 => struct NumberGame.SnapshotKey storage ref)"
@@ -9866,7 +9866,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 718,
-                                  "src": "8467:5:0",
+                                  "src": "8513:5:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                     "typeString": "uint256[] memory"
@@ -9880,7 +9880,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 752,
-                                  "src": "8473:1:0",
+                                  "src": "8519:1:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_uint256",
                                     "typeString": "uint256"
@@ -9891,7 +9891,7 @@
                                 "isPure": false,
                                 "lValueRequested": false,
                                 "nodeType": "IndexAccess",
-                                "src": "8467:8:0",
+                                "src": "8513:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -9902,7 +9902,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8442:34:0",
+                              "src": "8488:34:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_struct$_SnapshotKey_$154_storage",
                                 "typeString": "struct NumberGame.SnapshotKey storage ref"
@@ -9916,7 +9916,7 @@
                             "memberName": "timestamp",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": 151,
-                            "src": "8442:44:0",
+                            "src": "8488:44:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -9933,7 +9933,7 @@
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 1112,
-                              "src": "8489:5:0",
+                              "src": "8535:5:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_magic_block",
                                 "typeString": "block"
@@ -9947,13 +9947,13 @@
                             "memberName": "timestamp",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "8489:15:0",
+                            "src": "8535:15:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
                             }
                           },
-                          "src": "8442:62:0",
+                          "src": "8488:62:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -9961,7 +9961,7 @@
                         },
                         "id": 789,
                         "nodeType": "ExpressionStatement",
-                        "src": "8442:62:0"
+                        "src": "8488:62:0"
                       }
                     ]
                   },
@@ -9983,7 +9983,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 752,
-                      "src": "8322:1:0",
+                      "src": "8368:1:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -10000,7 +10000,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 718,
-                        "src": "8326:5:0",
+                        "src": "8372:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                           "typeString": "uint256[] memory"
@@ -10014,13 +10014,13 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "8326:12:0",
+                      "src": "8372:12:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "8322:16:0",
+                    "src": "8368:16:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -10038,7 +10038,7 @@
                         "name": "i",
                         "nodeType": "VariableDeclaration",
                         "scope": 793,
-                        "src": "8310:6:0",
+                        "src": "8356:6:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -10049,7 +10049,7 @@
                           "id": 751,
                           "name": "uint",
                           "nodeType": "ElementaryTypeName",
-                          "src": "8310:4:0",
+                          "src": "8356:4:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -10070,7 +10070,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "8319:1:0",
+                      "src": "8365:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -10079,7 +10079,7 @@
                       "value": "0"
                     },
                     "nodeType": "VariableDeclarationStatement",
-                    "src": "8310:10:0"
+                    "src": "8356:10:0"
                   },
                   "loopExpression": {
                     "expression": {
@@ -10092,7 +10092,7 @@
                       "nodeType": "UnaryOperation",
                       "operator": "++",
                       "prefix": false,
-                      "src": "8340:3:0",
+                      "src": "8386:3:0",
                       "subExpression": {
                         "argumentTypes": null,
                         "id": 759,
@@ -10100,7 +10100,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 752,
-                        "src": "8340:1:0",
+                        "src": "8386:1:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -10113,10 +10113,10 @@
                     },
                     "id": 761,
                     "nodeType": "ExpressionStatement",
-                    "src": "8340:3:0"
+                    "src": "8386:3:0"
                   },
                   "nodeType": "ForStatement",
-                  "src": "8305:210:0"
+                  "src": "8351:210:0"
                 }
               ]
             },
@@ -10359,7 +10359,7 @@
               "src": "8115:0:0"
             },
             "scope": 954,
-            "src": "7905:616:0",
+            "src": "7905:662:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
@@ -10368,7 +10368,7 @@
             "body": {
               "id": 896,
               "nodeType": "Block",
-              "src": "8722:634:0",
+              "src": "8768:680:0",
               "statements": [
                 {
                   "assignments": [
@@ -10381,7 +10381,7 @@
                       "name": "playerAddress",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8732:21:0",
+                      "src": "8778:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -10392,7 +10392,7 @@
                         "id": 813,
                         "name": "address",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8732:7:0",
+                        "src": "8778:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -10412,7 +10412,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "8756:3:0",
+                      "src": "8802:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -10426,14 +10426,14 @@
                     "memberName": "sender",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "8756:10:0",
+                    "src": "8802:10:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address",
                       "typeString": "address"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8732:34:0"
+                  "src": "8778:34:0"
                 },
                 {
                   "assignments": [
@@ -10446,7 +10446,7 @@
                       "name": "depositAmount",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8776:21:0",
+                      "src": "8822:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -10457,7 +10457,7 @@
                         "id": 818,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8776:7:0",
+                        "src": "8822:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -10477,7 +10477,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "8800:3:0",
+                      "src": "8846:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -10491,14 +10491,14 @@
                     "memberName": "value",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "8800:9:0",
+                    "src": "8846:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8776:33:0"
+                  "src": "8822:33:0"
                 },
                 {
                   "assignments": [
@@ -10511,7 +10511,7 @@
                       "name": "currentGame",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8820:24:0",
+                      "src": "8866:24:0",
                       "stateVariable": false,
                       "storageLocation": "storage",
                       "typeDescriptions": {
@@ -10524,7 +10524,7 @@
                         "name": "Game",
                         "nodeType": "UserDefinedTypeName",
                         "referencedDeclaration": 189,
-                        "src": "8820:4:0",
+                        "src": "8866:4:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game"
@@ -10544,7 +10544,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 149,
-                      "src": "8847:6:0",
+                      "src": "8893:6:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_Game_$189_storage_$",
                         "typeString": "mapping(uint256 => struct NumberGame.Game storage ref)"
@@ -10558,7 +10558,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 795,
-                      "src": "8854:10:0",
+                      "src": "8900:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -10569,14 +10569,14 @@
                     "isPure": false,
                     "lValueRequested": false,
                     "nodeType": "IndexAccess",
-                    "src": "8847:18:0",
+                    "src": "8893:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_Game_$189_storage",
                       "typeString": "struct NumberGame.Game storage ref"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8820:45:0"
+                  "src": "8866:45:0"
                 },
                 {
                   "assignments": [
@@ -10589,7 +10589,7 @@
                       "name": "userName",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8875:16:0",
+                      "src": "8921:16:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -10600,7 +10600,7 @@
                         "id": 829,
                         "name": "bytes32",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8875:7:0",
+                        "src": "8921:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_bytes32",
                           "typeString": "bytes32"
@@ -10621,7 +10621,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 814,
-                        "src": "8919:13:0",
+                        "src": "8965:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -10642,7 +10642,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 53,
-                        "src": "8894:10:0",
+                        "src": "8940:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_contract$_PlayerBookInterface_$17",
                           "typeString": "contract PlayerBookInterface"
@@ -10656,7 +10656,7 @@
                       "memberName": "getPlayerName",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 9,
-                      "src": "8894:24:0",
+                      "src": "8940:24:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_external_view$_t_address_$returns$_t_bytes32_$",
                         "typeString": "function (address) view external returns (bytes32)"
@@ -10670,14 +10670,14 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8894:39:0",
+                    "src": "8940:39:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8875:58:0"
+                  "src": "8921:58:0"
                 },
                 {
                   "expression": {
@@ -10690,7 +10690,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 795,
-                        "src": "8970:10:0",
+                        "src": "9029:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -10703,7 +10703,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 819,
-                        "src": "8982:13:0",
+                        "src": "9053:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -10718,7 +10718,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 824,
-                          "src": "8997:11:0",
+                          "src": "9080:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -10732,7 +10732,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "8997:25:0",
+                        "src": "9080:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -10759,7 +10759,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 375,
-                      "src": "8952:17:0",
+                      "src": "8998:17:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_nonpayable$_t_uint256_$_t_uint256_$_t_address_$returns$__$",
                         "typeString": "function (uint256,uint256,address)"
@@ -10773,7 +10773,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8952:71:0",
+                    "src": "8998:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -10781,7 +10781,7 @@
                   },
                   "id": 842,
                   "nodeType": "ExpressionStatement",
-                  "src": "8952:71:0"
+                  "src": "8998:117:0"
                 },
                 {
                   "condition": {
@@ -10808,7 +10808,7 @@
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 824,
-                            "src": "9045:11:0",
+                            "src": "9137:11:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                               "typeString": "struct NumberGame.Game storage pointer"
@@ -10822,7 +10822,7 @@
                           "memberName": "userKeys",
                           "nodeType": "MemberAccess",
                           "referencedDeclaration": 188,
-                          "src": "9045:20:0",
+                          "src": "9137:20:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_mapping$_t_bytes32_$_t_array$_t_uint256_$dyn_storage_$",
                             "typeString": "mapping(bytes32 => uint256[] storage ref)"
@@ -10836,7 +10836,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 830,
-                          "src": "9066:8:0",
+                          "src": "9158:8:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_bytes32",
                             "typeString": "bytes32"
@@ -10847,7 +10847,7 @@
                         "isPure": false,
                         "lValueRequested": false,
                         "nodeType": "IndexAccess",
-                        "src": "9045:30:0",
+                        "src": "9137:30:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_storage",
                           "typeString": "uint256[] storage ref"
@@ -10861,7 +10861,7 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9045:37:0",
+                      "src": "9137:37:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -10879,7 +10879,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "9086:1:0",
+                      "src": "9178:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -10887,7 +10887,7 @@
                       },
                       "value": "0"
                     },
-                    "src": "9045:42:0",
+                    "src": "9137:42:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -10896,11 +10896,11 @@
                   "falseBody": null,
                   "id": 859,
                   "nodeType": "IfStatement",
-                  "src": "9042:112:0",
+                  "src": "9134:112:0",
                   "trueBody": {
                     "id": 858,
                     "nodeType": "Block",
-                    "src": "9089:65:0",
+                    "src": "9181:65:0",
                     "statements": [
                       {
                         "expression": {
@@ -10913,7 +10913,7 @@
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 830,
-                              "src": "9134:8:0",
+                              "src": "9226:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_bytes32",
                                 "typeString": "bytes32"
@@ -10936,7 +10936,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 824,
-                                "src": "9103:11:0",
+                                "src": "9195:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -10950,7 +10950,7 @@
                               "memberName": "participantes",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 175,
-                              "src": "9103:25:0",
+                              "src": "9195:25:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_bytes32_$dyn_storage",
                                 "typeString": "bytes32[] storage ref"
@@ -10964,7 +10964,7 @@
                             "memberName": "push",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "9103:30:0",
+                            "src": "9195:30:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_arraypush_nonpayable$_t_bytes32_$returns$_t_uint256_$",
                               "typeString": "function (bytes32) returns (uint256)"
@@ -10978,7 +10978,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9103:40:0",
+                          "src": "9195:40:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -10986,7 +10986,7 @@
                         },
                         "id": 857,
                         "nodeType": "ExpressionStatement",
-                        "src": "9103:40:0"
+                        "src": "9195:40:0"
                       }
                     ]
                   }
@@ -10995,7 +10995,7 @@
                   "body": {
                     "id": 894,
                     "nodeType": "Block",
-                    "src": "9212:138:0",
+                    "src": "9304:138:0",
                     "statements": [
                       {
                         "expression": {
@@ -11010,7 +11010,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 798,
-                                "src": "9262:5:0",
+                                "src": "9354:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -11024,7 +11024,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 861,
-                                "src": "9268:1:0",
+                                "src": "9360:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -11035,7 +11035,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9262:8:0",
+                              "src": "9354:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -11060,7 +11060,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 824,
-                                  "src": "9226:11:0",
+                                  "src": "9318:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -11074,7 +11074,7 @@
                                 "memberName": "userKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 188,
-                                "src": "9226:20:0",
+                                "src": "9318:20:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_bytes32_$_t_array$_t_uint256_$dyn_storage_$",
                                   "typeString": "mapping(bytes32 => uint256[] storage ref)"
@@ -11088,7 +11088,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 830,
-                                "src": "9247:8:0",
+                                "src": "9339:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_bytes32",
                                   "typeString": "bytes32"
@@ -11099,7 +11099,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9226:30:0",
+                              "src": "9318:30:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_uint256_$dyn_storage",
                                 "typeString": "uint256[] storage ref"
@@ -11113,7 +11113,7 @@
                             "memberName": "push",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "9226:35:0",
+                            "src": "9318:35:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_arraypush_nonpayable$_t_uint256_$returns$_t_uint256_$",
                               "typeString": "function (uint256) returns (uint256)"
@@ -11127,7 +11127,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9226:45:0",
+                          "src": "9318:45:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -11135,7 +11135,7 @@
                         },
                         "id": 881,
                         "nodeType": "ExpressionStatement",
-                        "src": "9226:45:0"
+                        "src": "9318:45:0"
                       },
                       {
                         "expression": {
@@ -11148,7 +11148,7 @@
                           "nodeType": "UnaryOperation",
                           "operator": "++",
                           "prefix": false,
-                          "src": "9285:28:0",
+                          "src": "9377:28:0",
                           "subExpression": {
                             "argumentTypes": null,
                             "baseExpression": {
@@ -11160,7 +11160,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 824,
-                                "src": "9285:11:0",
+                                "src": "9377:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -11174,7 +11174,7 @@
                               "memberName": "keys",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 179,
-                              "src": "9285:16:0",
+                              "src": "9377:16:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_uint256_$_t_uint256_$",
                                 "typeString": "mapping(uint256 => uint256)"
@@ -11190,7 +11190,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 798,
-                                "src": "9302:5:0",
+                                "src": "9394:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -11204,7 +11204,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 861,
-                                "src": "9308:1:0",
+                                "src": "9400:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -11215,7 +11215,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9302:8:0",
+                              "src": "9394:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -11226,7 +11226,7 @@
                             "isPure": false,
                             "lValueRequested": true,
                             "nodeType": "IndexAccess",
-                            "src": "9285:26:0",
+                            "src": "9377:26:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -11239,7 +11239,7 @@
                         },
                         "id": 890,
                         "nodeType": "ExpressionStatement",
-                        "src": "9285:28:0"
+                        "src": "9377:28:0"
                       },
                       {
                         "expression": {
@@ -11252,7 +11252,7 @@
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 306,
-                            "src": "9327:10:0",
+                            "src": "9419:10:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_internal_nonpayable$__$returns$_t_bool_$",
                               "typeString": "function () returns (bool)"
@@ -11266,7 +11266,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9327:12:0",
+                          "src": "9419:12:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_bool",
                             "typeString": "bool"
@@ -11274,7 +11274,7 @@
                         },
                         "id": 893,
                         "nodeType": "ExpressionStatement",
-                        "src": "9327:12:0"
+                        "src": "9419:12:0"
                       }
                     ]
                   },
@@ -11296,7 +11296,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 861,
-                      "src": "9189:1:0",
+                      "src": "9281:1:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -11313,7 +11313,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 798,
-                        "src": "9193:5:0",
+                        "src": "9285:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                           "typeString": "uint256[] memory"
@@ -11327,13 +11327,13 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9193:12:0",
+                      "src": "9285:12:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9189:16:0",
+                    "src": "9281:16:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -11351,7 +11351,7 @@
                         "name": "i",
                         "nodeType": "VariableDeclaration",
                         "scope": 897,
-                        "src": "9177:6:0",
+                        "src": "9269:6:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -11362,7 +11362,7 @@
                           "id": 860,
                           "name": "uint",
                           "nodeType": "ElementaryTypeName",
-                          "src": "9177:4:0",
+                          "src": "9269:4:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -11383,7 +11383,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "9186:1:0",
+                      "src": "9278:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -11392,7 +11392,7 @@
                       "value": "0"
                     },
                     "nodeType": "VariableDeclarationStatement",
-                    "src": "9177:10:0"
+                    "src": "9269:10:0"
                   },
                   "loopExpression": {
                     "expression": {
@@ -11405,7 +11405,7 @@
                       "nodeType": "UnaryOperation",
                       "operator": "++",
                       "prefix": false,
-                      "src": "9207:3:0",
+                      "src": "9299:3:0",
                       "subExpression": {
                         "argumentTypes": null,
                         "id": 868,
@@ -11413,7 +11413,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 861,
-                        "src": "9207:1:0",
+                        "src": "9299:1:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11426,10 +11426,10 @@
                     },
                     "id": 870,
                     "nodeType": "ExpressionStatement",
-                    "src": "9207:3:0"
+                    "src": "9299:3:0"
                   },
                   "nodeType": "ForStatement",
-                  "src": "9172:178:0"
+                  "src": "9264:178:0"
                 }
               ]
             },
@@ -11449,14 +11449,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 72,
-                  "src": "8604:16:0",
+                  "src": "8650:16:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$__$",
                     "typeString": "modifier ()"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8604:16:0"
+                "src": "8650:16:0"
               },
               {
                 "arguments": [
@@ -11467,7 +11467,7 @@
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
                     "referencedDeclaration": 798,
-                    "src": "8639:5:0",
+                    "src": "8685:5:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                       "typeString": "uint256[] memory"
@@ -11482,14 +11482,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 114,
-                  "src": "8627:11:0",
+                  "src": "8673:11:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_array$_t_uint256_$dyn_memory_ptr_$",
                     "typeString": "modifier (uint256[] memory)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8627:18:0"
+                "src": "8673:18:0"
               },
               {
                 "arguments": [
@@ -11505,7 +11505,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 798,
-                          "src": "8689:5:0",
+                          "src": "8735:5:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                             "typeString": "uint256[] memory"
@@ -11519,7 +11519,7 @@
                         "memberName": "length",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": null,
-                        "src": "8689:12:0",
+                        "src": "8735:12:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11540,7 +11540,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 130,
-                        "src": "8675:9:0",
+                        "src": "8721:9:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11554,7 +11554,7 @@
                       "memberName": "mul",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 989,
-                      "src": "8675:13:0",
+                      "src": "8721:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_pure$_t_uint256_$_t_uint256_$returns$_t_uint256_$bound_to$_t_uint256_$",
                         "typeString": "function (uint256,uint256) pure returns (uint256)"
@@ -11568,7 +11568,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8675:27:0",
+                    "src": "8721:27:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -11583,14 +11583,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 86,
-                  "src": "8652:22:0",
+                  "src": "8698:22:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_uint256_$",
                     "typeString": "modifier (uint256)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8652:51:0"
+                "src": "8698:51:0"
               }
             ],
             "name": "buyKeys",
@@ -11605,7 +11605,7 @@
                   "name": "_gameRound",
                   "nodeType": "VariableDeclaration",
                   "scope": 897,
-                  "src": "8548:18:0",
+                  "src": "8594:18:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -11616,7 +11616,7 @@
                     "id": 794,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "8548:7:0",
+                    "src": "8594:7:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -11631,7 +11631,7 @@
                   "name": "_keys",
                   "nodeType": "VariableDeclaration",
                   "scope": 897,
-                  "src": "8568:15:0",
+                  "src": "8614:15:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -11643,7 +11643,7 @@
                       "id": 796,
                       "name": "uint256",
                       "nodeType": "ElementaryTypeName",
-                      "src": "8568:7:0",
+                      "src": "8614:7:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -11652,7 +11652,7 @@
                     "id": 797,
                     "length": null,
                     "nodeType": "ArrayTypeName",
-                    "src": "8568:9:0",
+                    "src": "8614:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
                       "typeString": "uint256[]"
@@ -11662,17 +11662,17 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "8547:37:0"
+              "src": "8593:37:0"
             },
             "payable": true,
             "returnParameters": {
               "id": 812,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "8722:0:0"
+              "src": "8768:0:0"
             },
             "scope": 954,
-            "src": "8531:825:0",
+            "src": "8577:871:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
@@ -11681,7 +11681,7 @@
             "body": {
               "id": 952,
               "nodeType": "Block",
-              "src": "9521:417:0",
+              "src": "9613:463:0",
               "statements": [
                 {
                   "assignments": [
@@ -11694,7 +11694,7 @@
                       "name": "currentGame",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9531:24:0",
+                      "src": "9623:24:0",
                       "stateVariable": false,
                       "storageLocation": "storage",
                       "typeDescriptions": {
@@ -11707,7 +11707,7 @@
                         "name": "Game",
                         "nodeType": "UserDefinedTypeName",
                         "referencedDeclaration": 189,
-                        "src": "9531:4:0",
+                        "src": "9623:4:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game"
@@ -11727,7 +11727,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 149,
-                      "src": "9558:6:0",
+                      "src": "9650:6:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_Game_$189_storage_$",
                         "typeString": "mapping(uint256 => struct NumberGame.Game storage ref)"
@@ -11741,7 +11741,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 899,
-                      "src": "9565:10:0",
+                      "src": "9657:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -11752,14 +11752,14 @@
                     "isPure": false,
                     "lValueRequested": false,
                     "nodeType": "IndexAccess",
-                    "src": "9558:18:0",
+                    "src": "9650:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_Game_$189_storage",
                       "typeString": "struct NumberGame.Game storage ref"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9531:45:0"
+                  "src": "9623:45:0"
                 },
                 {
                   "assignments": [
@@ -11772,7 +11772,7 @@
                       "name": "depositAmount",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9586:21:0",
+                      "src": "9678:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -11783,7 +11783,7 @@
                         "id": 913,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9586:7:0",
+                        "src": "9678:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11803,7 +11803,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "9610:3:0",
+                      "src": "9702:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -11817,14 +11817,14 @@
                     "memberName": "value",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "9610:9:0",
+                    "src": "9702:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9586:33:0"
+                  "src": "9678:33:0"
                 },
                 {
                   "expression": {
@@ -11837,7 +11837,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 899,
-                        "src": "9647:10:0",
+                        "src": "9752:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11850,7 +11850,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 914,
-                        "src": "9659:13:0",
+                        "src": "9776:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -11865,7 +11865,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 908,
-                          "src": "9674:11:0",
+                          "src": "9803:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -11879,7 +11879,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "9674:25:0",
+                        "src": "9803:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -11906,7 +11906,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 375,
-                      "src": "9629:17:0",
+                      "src": "9721:17:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_nonpayable$_t_uint256_$_t_uint256_$_t_address_$returns$__$",
                         "typeString": "function (uint256,uint256,address)"
@@ -11920,7 +11920,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "9629:71:0",
+                    "src": "9721:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -11928,7 +11928,7 @@
                   },
                   "id": 924,
                   "nodeType": "ExpressionStatement",
-                  "src": "9629:71:0"
+                  "src": "9721:117:0"
                 },
                 {
                   "assignments": [
@@ -11942,7 +11942,7 @@
                       "name": "winnerName",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9711:18:0",
+                      "src": "9849:18:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -11953,7 +11953,7 @@
                         "id": 925,
                         "name": "bytes32",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9711:7:0",
+                        "src": "9849:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_bytes32",
                           "typeString": "bytes32"
@@ -11968,7 +11968,7 @@
                       "name": "winningNumber",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9731:21:0",
+                      "src": "9869:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -11979,7 +11979,7 @@
                         "id": 927,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9731:7:0",
+                        "src": "9869:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -12000,7 +12000,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 899,
-                        "src": "9770:10:0",
+                        "src": "9908:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -12019,7 +12019,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 493,
-                      "src": "9756:13:0",
+                      "src": "9894:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_view$_t_uint256_$returns$_t_bytes32_$_t_uint256_$",
                         "typeString": "function (uint256) view returns (bytes32,uint256)"
@@ -12033,14 +12033,14 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "9756:25:0",
+                    "src": "9894:25:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$_t_bytes32_$_t_uint256_$",
                       "typeString": "tuple(bytes32,uint256)"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9710:71:0"
+                  "src": "9848:71:0"
                 },
                 {
                   "expression": {
@@ -12059,7 +12059,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9791:11:0",
+                        "src": "9929:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -12073,7 +12073,7 @@
                       "memberName": "winnerName",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 166,
-                      "src": "9791:22:0",
+                      "src": "9929:22:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_bytes32",
                         "typeString": "bytes32"
@@ -12088,13 +12088,13 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 926,
-                      "src": "9816:10:0",
+                      "src": "9954:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_bytes32",
                         "typeString": "bytes32"
                       }
                     },
-                    "src": "9791:35:0",
+                    "src": "9929:35:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
@@ -12102,7 +12102,7 @@
                   },
                   "id": 938,
                   "nodeType": "ExpressionStatement",
-                  "src": "9791:35:0"
+                  "src": "9929:35:0"
                 },
                 {
                   "expression": {
@@ -12121,7 +12121,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9836:11:0",
+                        "src": "9974:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -12135,7 +12135,7 @@
                       "memberName": "winnerNumber",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 170,
-                      "src": "9836:24:0",
+                      "src": "9974:24:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -12150,13 +12150,13 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 928,
-                      "src": "9863:13:0",
+                      "src": "10001:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9836:40:0",
+                    "src": "9974:40:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -12164,7 +12164,7 @@
                   },
                   "id": 944,
                   "nodeType": "ExpressionStatement",
-                  "src": "9836:40:0"
+                  "src": "9974:40:0"
                 },
                 {
                   "expression": {
@@ -12183,7 +12183,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9886:11:0",
+                        "src": "10024:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -12197,7 +12197,7 @@
                       "memberName": "winnerTimestamp",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 172,
-                      "src": "9886:27:0",
+                      "src": "10024:27:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -12214,7 +12214,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 1112,
-                        "src": "9916:5:0",
+                        "src": "10054:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_magic_block",
                           "typeString": "block"
@@ -12228,13 +12228,13 @@
                       "memberName": "timestamp",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9916:15:0",
+                      "src": "10054:15:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9886:45:0",
+                    "src": "10024:45:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -12242,7 +12242,7 @@
                   },
                   "id": 951,
                   "nodeType": "ExpressionStatement",
-                  "src": "9886:45:0"
+                  "src": "10024:45:0"
                 }
               ]
             },
@@ -12262,14 +12262,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 72,
-                  "src": "9433:16:0",
+                  "src": "9525:16:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$__$",
                     "typeString": "modifier ()"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "9433:16:0"
+                "src": "9525:16:0"
               },
               {
                 "arguments": [
@@ -12280,7 +12280,7 @@
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
                     "referencedDeclaration": 145,
-                    "src": "9481:18:0",
+                    "src": "9573:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -12295,14 +12295,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 86,
-                  "src": "9458:22:0",
+                  "src": "9550:22:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_uint256_$",
                     "typeString": "modifier (uint256)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "9458:42:0"
+                "src": "9550:42:0"
               }
             ],
             "name": "snapshotWinner",
@@ -12317,7 +12317,7 @@
                   "name": "_gameRound",
                   "nodeType": "VariableDeclaration",
                   "scope": 953,
-                  "src": "9390:18:0",
+                  "src": "9482:18:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -12328,7 +12328,7 @@
                     "id": 898,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "9390:7:0",
+                    "src": "9482:7:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -12338,27 +12338,27 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "9389:20:0"
+              "src": "9481:20:0"
             },
             "payable": true,
             "returnParameters": {
               "id": 906,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "9521:0:0"
+              "src": "9613:0:0"
             },
             "scope": 954,
-            "src": "9366:572:0",
+            "src": "9458:618:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
           }
         ],
         "scope": 955,
-        "src": "613:9332:0"
+        "src": "613:9470:0"
       }
     ],
-    "src": "0:9946:0"
+    "src": "0:10084:0"
   },
   "legacyAST": {
     "absolutePath": "/Users/waynechiu/Desktop/dApp/contracts/NumberGame.sol",
@@ -12958,7 +12958,7 @@
             },
             "value": {
               "argumentTypes": null,
-              "hexValue": "307837643764374632443533323942663936416332426363393036303333633234443063313530326431",
+              "hexValue": "307863346330313736353738373746316436346638423037413432643839353938373537454165373365",
               "id": 47,
               "isConstant": false,
               "isLValue": false,
@@ -12972,7 +12972,7 @@
                 "typeIdentifier": "t_address",
                 "typeString": "address"
               },
-              "value": "0x7d7d7F2D5329Bf96Ac2Bcc906033c24D0c1502d1"
+              "value": "0xc4c017657877F1d64f8B07A42d89598757EAe73e"
             },
             "visibility": "internal"
           },
@@ -21672,7 +21672,7 @@
             "body": {
               "id": 792,
               "nodeType": "Block",
-              "src": "8115:406:0",
+              "src": "8115:452:0",
               "statements": [
                 {
                   "assignments": [
@@ -21828,7 +21828,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 715,
-                        "src": "8241:10:0",
+                        "src": "8254:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -21841,7 +21841,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 740,
-                        "src": "8253:13:0",
+                        "src": "8278:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -21856,7 +21856,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 734,
-                          "src": "8268:11:0",
+                          "src": "8305:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -21870,7 +21870,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "8268:25:0",
+                        "src": "8305:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -21911,7 +21911,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8223:71:0",
+                    "src": "8223:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -21919,13 +21919,13 @@
                   },
                   "id": 750,
                   "nodeType": "ExpressionStatement",
-                  "src": "8223:71:0"
+                  "src": "8223:117:0"
                 },
                 {
                   "body": {
                     "id": 790,
                     "nodeType": "Block",
-                    "src": "8345:170:0",
+                    "src": "8391:170:0",
                     "statements": [
                       {
                         "expression": {
@@ -21948,7 +21948,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 734,
-                                  "src": "8359:11:0",
+                                  "src": "8405:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -21962,7 +21962,7 @@
                                 "memberName": "snapshotKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 183,
-                                "src": "8359:24:0",
+                                "src": "8405:24:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_SnapshotKey_$154_storage_$",
                                   "typeString": "mapping(uint256 => struct NumberGame.SnapshotKey storage ref)"
@@ -21978,7 +21978,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 718,
-                                  "src": "8384:5:0",
+                                  "src": "8430:5:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                     "typeString": "uint256[] memory"
@@ -21992,7 +21992,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 752,
-                                  "src": "8390:1:0",
+                                  "src": "8436:1:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_uint256",
                                     "typeString": "uint256"
@@ -22003,7 +22003,7 @@
                                 "isPure": false,
                                 "lValueRequested": false,
                                 "nodeType": "IndexAccess",
-                                "src": "8384:8:0",
+                                "src": "8430:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -22014,7 +22014,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8359:34:0",
+                              "src": "8405:34:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_struct$_SnapshotKey_$154_storage",
                                 "typeString": "struct NumberGame.SnapshotKey storage ref"
@@ -22028,7 +22028,7 @@
                             "memberName": "count",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": 153,
-                            "src": "8359:40:0",
+                            "src": "8405:40:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -22047,7 +22047,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 734,
-                                "src": "8402:11:0",
+                                "src": "8448:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -22061,7 +22061,7 @@
                               "memberName": "keys",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 179,
-                              "src": "8402:16:0",
+                              "src": "8448:16:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_uint256_$_t_uint256_$",
                                 "typeString": "mapping(uint256 => uint256)"
@@ -22077,7 +22077,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 718,
-                                "src": "8419:5:0",
+                                "src": "8465:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -22091,7 +22091,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 752,
-                                "src": "8425:1:0",
+                                "src": "8471:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -22102,7 +22102,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8419:8:0",
+                              "src": "8465:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -22113,13 +22113,13 @@
                             "isPure": false,
                             "lValueRequested": false,
                             "nodeType": "IndexAccess",
-                            "src": "8402:26:0",
+                            "src": "8448:26:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
                             }
                           },
-                          "src": "8359:69:0",
+                          "src": "8405:69:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -22127,7 +22127,7 @@
                         },
                         "id": 777,
                         "nodeType": "ExpressionStatement",
-                        "src": "8359:69:0"
+                        "src": "8405:69:0"
                       },
                       {
                         "expression": {
@@ -22150,7 +22150,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 734,
-                                  "src": "8442:11:0",
+                                  "src": "8488:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -22164,7 +22164,7 @@
                                 "memberName": "snapshotKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 183,
-                                "src": "8442:24:0",
+                                "src": "8488:24:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_SnapshotKey_$154_storage_$",
                                   "typeString": "mapping(uint256 => struct NumberGame.SnapshotKey storage ref)"
@@ -22180,7 +22180,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 718,
-                                  "src": "8467:5:0",
+                                  "src": "8513:5:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                     "typeString": "uint256[] memory"
@@ -22194,7 +22194,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 752,
-                                  "src": "8473:1:0",
+                                  "src": "8519:1:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_uint256",
                                     "typeString": "uint256"
@@ -22205,7 +22205,7 @@
                                 "isPure": false,
                                 "lValueRequested": false,
                                 "nodeType": "IndexAccess",
-                                "src": "8467:8:0",
+                                "src": "8513:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -22216,7 +22216,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "8442:34:0",
+                              "src": "8488:34:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_struct$_SnapshotKey_$154_storage",
                                 "typeString": "struct NumberGame.SnapshotKey storage ref"
@@ -22230,7 +22230,7 @@
                             "memberName": "timestamp",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": 151,
-                            "src": "8442:44:0",
+                            "src": "8488:44:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -22247,7 +22247,7 @@
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 1112,
-                              "src": "8489:5:0",
+                              "src": "8535:5:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_magic_block",
                                 "typeString": "block"
@@ -22261,13 +22261,13 @@
                             "memberName": "timestamp",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "8489:15:0",
+                            "src": "8535:15:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
                             }
                           },
-                          "src": "8442:62:0",
+                          "src": "8488:62:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -22275,7 +22275,7 @@
                         },
                         "id": 789,
                         "nodeType": "ExpressionStatement",
-                        "src": "8442:62:0"
+                        "src": "8488:62:0"
                       }
                     ]
                   },
@@ -22297,7 +22297,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 752,
-                      "src": "8322:1:0",
+                      "src": "8368:1:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -22314,7 +22314,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 718,
-                        "src": "8326:5:0",
+                        "src": "8372:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                           "typeString": "uint256[] memory"
@@ -22328,13 +22328,13 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "8326:12:0",
+                      "src": "8372:12:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "8322:16:0",
+                    "src": "8368:16:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -22352,7 +22352,7 @@
                         "name": "i",
                         "nodeType": "VariableDeclaration",
                         "scope": 793,
-                        "src": "8310:6:0",
+                        "src": "8356:6:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -22363,7 +22363,7 @@
                           "id": 751,
                           "name": "uint",
                           "nodeType": "ElementaryTypeName",
-                          "src": "8310:4:0",
+                          "src": "8356:4:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -22384,7 +22384,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "8319:1:0",
+                      "src": "8365:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -22393,7 +22393,7 @@
                       "value": "0"
                     },
                     "nodeType": "VariableDeclarationStatement",
-                    "src": "8310:10:0"
+                    "src": "8356:10:0"
                   },
                   "loopExpression": {
                     "expression": {
@@ -22406,7 +22406,7 @@
                       "nodeType": "UnaryOperation",
                       "operator": "++",
                       "prefix": false,
-                      "src": "8340:3:0",
+                      "src": "8386:3:0",
                       "subExpression": {
                         "argumentTypes": null,
                         "id": 759,
@@ -22414,7 +22414,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 752,
-                        "src": "8340:1:0",
+                        "src": "8386:1:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -22427,10 +22427,10 @@
                     },
                     "id": 761,
                     "nodeType": "ExpressionStatement",
-                    "src": "8340:3:0"
+                    "src": "8386:3:0"
                   },
                   "nodeType": "ForStatement",
-                  "src": "8305:210:0"
+                  "src": "8351:210:0"
                 }
               ]
             },
@@ -22673,7 +22673,7 @@
               "src": "8115:0:0"
             },
             "scope": 954,
-            "src": "7905:616:0",
+            "src": "7905:662:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
@@ -22682,7 +22682,7 @@
             "body": {
               "id": 896,
               "nodeType": "Block",
-              "src": "8722:634:0",
+              "src": "8768:680:0",
               "statements": [
                 {
                   "assignments": [
@@ -22695,7 +22695,7 @@
                       "name": "playerAddress",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8732:21:0",
+                      "src": "8778:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -22706,7 +22706,7 @@
                         "id": 813,
                         "name": "address",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8732:7:0",
+                        "src": "8778:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -22726,7 +22726,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "8756:3:0",
+                      "src": "8802:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -22740,14 +22740,14 @@
                     "memberName": "sender",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "8756:10:0",
+                    "src": "8802:10:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address",
                       "typeString": "address"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8732:34:0"
+                  "src": "8778:34:0"
                 },
                 {
                   "assignments": [
@@ -22760,7 +22760,7 @@
                       "name": "depositAmount",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8776:21:0",
+                      "src": "8822:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -22771,7 +22771,7 @@
                         "id": 818,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8776:7:0",
+                        "src": "8822:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -22791,7 +22791,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "8800:3:0",
+                      "src": "8846:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -22805,14 +22805,14 @@
                     "memberName": "value",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "8800:9:0",
+                    "src": "8846:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8776:33:0"
+                  "src": "8822:33:0"
                 },
                 {
                   "assignments": [
@@ -22825,7 +22825,7 @@
                       "name": "currentGame",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8820:24:0",
+                      "src": "8866:24:0",
                       "stateVariable": false,
                       "storageLocation": "storage",
                       "typeDescriptions": {
@@ -22838,7 +22838,7 @@
                         "name": "Game",
                         "nodeType": "UserDefinedTypeName",
                         "referencedDeclaration": 189,
-                        "src": "8820:4:0",
+                        "src": "8866:4:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game"
@@ -22858,7 +22858,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 149,
-                      "src": "8847:6:0",
+                      "src": "8893:6:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_Game_$189_storage_$",
                         "typeString": "mapping(uint256 => struct NumberGame.Game storage ref)"
@@ -22872,7 +22872,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 795,
-                      "src": "8854:10:0",
+                      "src": "8900:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -22883,14 +22883,14 @@
                     "isPure": false,
                     "lValueRequested": false,
                     "nodeType": "IndexAccess",
-                    "src": "8847:18:0",
+                    "src": "8893:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_Game_$189_storage",
                       "typeString": "struct NumberGame.Game storage ref"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8820:45:0"
+                  "src": "8866:45:0"
                 },
                 {
                   "assignments": [
@@ -22903,7 +22903,7 @@
                       "name": "userName",
                       "nodeType": "VariableDeclaration",
                       "scope": 897,
-                      "src": "8875:16:0",
+                      "src": "8921:16:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -22914,7 +22914,7 @@
                         "id": 829,
                         "name": "bytes32",
                         "nodeType": "ElementaryTypeName",
-                        "src": "8875:7:0",
+                        "src": "8921:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_bytes32",
                           "typeString": "bytes32"
@@ -22935,7 +22935,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 814,
-                        "src": "8919:13:0",
+                        "src": "8965:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -22956,7 +22956,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 53,
-                        "src": "8894:10:0",
+                        "src": "8940:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_contract$_PlayerBookInterface_$17",
                           "typeString": "contract PlayerBookInterface"
@@ -22970,7 +22970,7 @@
                       "memberName": "getPlayerName",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 9,
-                      "src": "8894:24:0",
+                      "src": "8940:24:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_external_view$_t_address_$returns$_t_bytes32_$",
                         "typeString": "function (address) view external returns (bytes32)"
@@ -22984,14 +22984,14 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8894:39:0",
+                    "src": "8940:39:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "8875:58:0"
+                  "src": "8921:58:0"
                 },
                 {
                   "expression": {
@@ -23004,7 +23004,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 795,
-                        "src": "8970:10:0",
+                        "src": "9029:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -23017,7 +23017,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 819,
-                        "src": "8982:13:0",
+                        "src": "9053:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -23032,7 +23032,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 824,
-                          "src": "8997:11:0",
+                          "src": "9080:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -23046,7 +23046,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "8997:25:0",
+                        "src": "9080:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -23073,7 +23073,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 375,
-                      "src": "8952:17:0",
+                      "src": "8998:17:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_nonpayable$_t_uint256_$_t_uint256_$_t_address_$returns$__$",
                         "typeString": "function (uint256,uint256,address)"
@@ -23087,7 +23087,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8952:71:0",
+                    "src": "8998:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -23095,7 +23095,7 @@
                   },
                   "id": 842,
                   "nodeType": "ExpressionStatement",
-                  "src": "8952:71:0"
+                  "src": "8998:117:0"
                 },
                 {
                   "condition": {
@@ -23122,7 +23122,7 @@
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 824,
-                            "src": "9045:11:0",
+                            "src": "9137:11:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                               "typeString": "struct NumberGame.Game storage pointer"
@@ -23136,7 +23136,7 @@
                           "memberName": "userKeys",
                           "nodeType": "MemberAccess",
                           "referencedDeclaration": 188,
-                          "src": "9045:20:0",
+                          "src": "9137:20:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_mapping$_t_bytes32_$_t_array$_t_uint256_$dyn_storage_$",
                             "typeString": "mapping(bytes32 => uint256[] storage ref)"
@@ -23150,7 +23150,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 830,
-                          "src": "9066:8:0",
+                          "src": "9158:8:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_bytes32",
                             "typeString": "bytes32"
@@ -23161,7 +23161,7 @@
                         "isPure": false,
                         "lValueRequested": false,
                         "nodeType": "IndexAccess",
-                        "src": "9045:30:0",
+                        "src": "9137:30:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_storage",
                           "typeString": "uint256[] storage ref"
@@ -23175,7 +23175,7 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9045:37:0",
+                      "src": "9137:37:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -23193,7 +23193,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "9086:1:0",
+                      "src": "9178:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -23201,7 +23201,7 @@
                       },
                       "value": "0"
                     },
-                    "src": "9045:42:0",
+                    "src": "9137:42:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -23210,11 +23210,11 @@
                   "falseBody": null,
                   "id": 859,
                   "nodeType": "IfStatement",
-                  "src": "9042:112:0",
+                  "src": "9134:112:0",
                   "trueBody": {
                     "id": 858,
                     "nodeType": "Block",
-                    "src": "9089:65:0",
+                    "src": "9181:65:0",
                     "statements": [
                       {
                         "expression": {
@@ -23227,7 +23227,7 @@
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 830,
-                              "src": "9134:8:0",
+                              "src": "9226:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_bytes32",
                                 "typeString": "bytes32"
@@ -23250,7 +23250,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 824,
-                                "src": "9103:11:0",
+                                "src": "9195:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -23264,7 +23264,7 @@
                               "memberName": "participantes",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 175,
-                              "src": "9103:25:0",
+                              "src": "9195:25:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_bytes32_$dyn_storage",
                                 "typeString": "bytes32[] storage ref"
@@ -23278,7 +23278,7 @@
                             "memberName": "push",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "9103:30:0",
+                            "src": "9195:30:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_arraypush_nonpayable$_t_bytes32_$returns$_t_uint256_$",
                               "typeString": "function (bytes32) returns (uint256)"
@@ -23292,7 +23292,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9103:40:0",
+                          "src": "9195:40:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -23300,7 +23300,7 @@
                         },
                         "id": 857,
                         "nodeType": "ExpressionStatement",
-                        "src": "9103:40:0"
+                        "src": "9195:40:0"
                       }
                     ]
                   }
@@ -23309,7 +23309,7 @@
                   "body": {
                     "id": 894,
                     "nodeType": "Block",
-                    "src": "9212:138:0",
+                    "src": "9304:138:0",
                     "statements": [
                       {
                         "expression": {
@@ -23324,7 +23324,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 798,
-                                "src": "9262:5:0",
+                                "src": "9354:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -23338,7 +23338,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 861,
-                                "src": "9268:1:0",
+                                "src": "9360:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -23349,7 +23349,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9262:8:0",
+                              "src": "9354:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -23374,7 +23374,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": 824,
-                                  "src": "9226:11:0",
+                                  "src": "9318:11:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                     "typeString": "struct NumberGame.Game storage pointer"
@@ -23388,7 +23388,7 @@
                                 "memberName": "userKeys",
                                 "nodeType": "MemberAccess",
                                 "referencedDeclaration": 188,
-                                "src": "9226:20:0",
+                                "src": "9318:20:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_mapping$_t_bytes32_$_t_array$_t_uint256_$dyn_storage_$",
                                   "typeString": "mapping(bytes32 => uint256[] storage ref)"
@@ -23402,7 +23402,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 830,
-                                "src": "9247:8:0",
+                                "src": "9339:8:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_bytes32",
                                   "typeString": "bytes32"
@@ -23413,7 +23413,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9226:30:0",
+                              "src": "9318:30:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_array$_t_uint256_$dyn_storage",
                                 "typeString": "uint256[] storage ref"
@@ -23427,7 +23427,7 @@
                             "memberName": "push",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": null,
-                            "src": "9226:35:0",
+                            "src": "9318:35:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_arraypush_nonpayable$_t_uint256_$returns$_t_uint256_$",
                               "typeString": "function (uint256) returns (uint256)"
@@ -23441,7 +23441,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9226:45:0",
+                          "src": "9318:45:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -23449,7 +23449,7 @@
                         },
                         "id": 881,
                         "nodeType": "ExpressionStatement",
-                        "src": "9226:45:0"
+                        "src": "9318:45:0"
                       },
                       {
                         "expression": {
@@ -23462,7 +23462,7 @@
                           "nodeType": "UnaryOperation",
                           "operator": "++",
                           "prefix": false,
-                          "src": "9285:28:0",
+                          "src": "9377:28:0",
                           "subExpression": {
                             "argumentTypes": null,
                             "baseExpression": {
@@ -23474,7 +23474,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 824,
-                                "src": "9285:11:0",
+                                "src": "9377:11:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                                   "typeString": "struct NumberGame.Game storage pointer"
@@ -23488,7 +23488,7 @@
                               "memberName": "keys",
                               "nodeType": "MemberAccess",
                               "referencedDeclaration": 179,
-                              "src": "9285:16:0",
+                              "src": "9377:16:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_mapping$_t_uint256_$_t_uint256_$",
                                 "typeString": "mapping(uint256 => uint256)"
@@ -23504,7 +23504,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 798,
-                                "src": "9302:5:0",
+                                "src": "9394:5:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                                   "typeString": "uint256[] memory"
@@ -23518,7 +23518,7 @@
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
                                 "referencedDeclaration": 861,
-                                "src": "9308:1:0",
+                                "src": "9400:1:0",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_uint256",
                                   "typeString": "uint256"
@@ -23529,7 +23529,7 @@
                               "isPure": false,
                               "lValueRequested": false,
                               "nodeType": "IndexAccess",
-                              "src": "9302:8:0",
+                              "src": "9394:8:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_uint256",
                                 "typeString": "uint256"
@@ -23540,7 +23540,7 @@
                             "isPure": false,
                             "lValueRequested": true,
                             "nodeType": "IndexAccess",
-                            "src": "9285:26:0",
+                            "src": "9377:26:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -23553,7 +23553,7 @@
                         },
                         "id": 890,
                         "nodeType": "ExpressionStatement",
-                        "src": "9285:28:0"
+                        "src": "9377:28:0"
                       },
                       {
                         "expression": {
@@ -23566,7 +23566,7 @@
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 306,
-                            "src": "9327:10:0",
+                            "src": "9419:10:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_function_internal_nonpayable$__$returns$_t_bool_$",
                               "typeString": "function () returns (bool)"
@@ -23580,7 +23580,7 @@
                           "lValueRequested": false,
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "9327:12:0",
+                          "src": "9419:12:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_bool",
                             "typeString": "bool"
@@ -23588,7 +23588,7 @@
                         },
                         "id": 893,
                         "nodeType": "ExpressionStatement",
-                        "src": "9327:12:0"
+                        "src": "9419:12:0"
                       }
                     ]
                   },
@@ -23610,7 +23610,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 861,
-                      "src": "9189:1:0",
+                      "src": "9281:1:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -23627,7 +23627,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 798,
-                        "src": "9193:5:0",
+                        "src": "9285:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                           "typeString": "uint256[] memory"
@@ -23641,13 +23641,13 @@
                       "memberName": "length",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9193:12:0",
+                      "src": "9285:12:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9189:16:0",
+                    "src": "9281:16:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bool",
                       "typeString": "bool"
@@ -23665,7 +23665,7 @@
                         "name": "i",
                         "nodeType": "VariableDeclaration",
                         "scope": 897,
-                        "src": "9177:6:0",
+                        "src": "9269:6:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -23676,7 +23676,7 @@
                           "id": 860,
                           "name": "uint",
                           "nodeType": "ElementaryTypeName",
-                          "src": "9177:4:0",
+                          "src": "9269:4:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -23697,7 +23697,7 @@
                       "kind": "number",
                       "lValueRequested": false,
                       "nodeType": "Literal",
-                      "src": "9186:1:0",
+                      "src": "9278:1:0",
                       "subdenomination": null,
                       "typeDescriptions": {
                         "typeIdentifier": "t_rational_0_by_1",
@@ -23706,7 +23706,7 @@
                       "value": "0"
                     },
                     "nodeType": "VariableDeclarationStatement",
-                    "src": "9177:10:0"
+                    "src": "9269:10:0"
                   },
                   "loopExpression": {
                     "expression": {
@@ -23719,7 +23719,7 @@
                       "nodeType": "UnaryOperation",
                       "operator": "++",
                       "prefix": false,
-                      "src": "9207:3:0",
+                      "src": "9299:3:0",
                       "subExpression": {
                         "argumentTypes": null,
                         "id": 868,
@@ -23727,7 +23727,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 861,
-                        "src": "9207:1:0",
+                        "src": "9299:1:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -23740,10 +23740,10 @@
                     },
                     "id": 870,
                     "nodeType": "ExpressionStatement",
-                    "src": "9207:3:0"
+                    "src": "9299:3:0"
                   },
                   "nodeType": "ForStatement",
-                  "src": "9172:178:0"
+                  "src": "9264:178:0"
                 }
               ]
             },
@@ -23763,14 +23763,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 72,
-                  "src": "8604:16:0",
+                  "src": "8650:16:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$__$",
                     "typeString": "modifier ()"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8604:16:0"
+                "src": "8650:16:0"
               },
               {
                 "arguments": [
@@ -23781,7 +23781,7 @@
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
                     "referencedDeclaration": 798,
-                    "src": "8639:5:0",
+                    "src": "8685:5:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                       "typeString": "uint256[] memory"
@@ -23796,14 +23796,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 114,
-                  "src": "8627:11:0",
+                  "src": "8673:11:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_array$_t_uint256_$dyn_memory_ptr_$",
                     "typeString": "modifier (uint256[] memory)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8627:18:0"
+                "src": "8673:18:0"
               },
               {
                 "arguments": [
@@ -23819,7 +23819,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 798,
-                          "src": "8689:5:0",
+                          "src": "8735:5:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
                             "typeString": "uint256[] memory"
@@ -23833,7 +23833,7 @@
                         "memberName": "length",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": null,
-                        "src": "8689:12:0",
+                        "src": "8735:12:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -23854,7 +23854,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 130,
-                        "src": "8675:9:0",
+                        "src": "8721:9:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -23868,7 +23868,7 @@
                       "memberName": "mul",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 989,
-                      "src": "8675:13:0",
+                      "src": "8721:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_pure$_t_uint256_$_t_uint256_$returns$_t_uint256_$bound_to$_t_uint256_$",
                         "typeString": "function (uint256,uint256) pure returns (uint256)"
@@ -23882,7 +23882,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "8675:27:0",
+                    "src": "8721:27:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -23897,14 +23897,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 86,
-                  "src": "8652:22:0",
+                  "src": "8698:22:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_uint256_$",
                     "typeString": "modifier (uint256)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "8652:51:0"
+                "src": "8698:51:0"
               }
             ],
             "name": "buyKeys",
@@ -23919,7 +23919,7 @@
                   "name": "_gameRound",
                   "nodeType": "VariableDeclaration",
                   "scope": 897,
-                  "src": "8548:18:0",
+                  "src": "8594:18:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -23930,7 +23930,7 @@
                     "id": 794,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "8548:7:0",
+                    "src": "8594:7:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -23945,7 +23945,7 @@
                   "name": "_keys",
                   "nodeType": "VariableDeclaration",
                   "scope": 897,
-                  "src": "8568:15:0",
+                  "src": "8614:15:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -23957,7 +23957,7 @@
                       "id": 796,
                       "name": "uint256",
                       "nodeType": "ElementaryTypeName",
-                      "src": "8568:7:0",
+                      "src": "8614:7:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -23966,7 +23966,7 @@
                     "id": 797,
                     "length": null,
                     "nodeType": "ArrayTypeName",
-                    "src": "8568:9:0",
+                    "src": "8614:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
                       "typeString": "uint256[]"
@@ -23976,17 +23976,17 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "8547:37:0"
+              "src": "8593:37:0"
             },
             "payable": true,
             "returnParameters": {
               "id": 812,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "8722:0:0"
+              "src": "8768:0:0"
             },
             "scope": 954,
-            "src": "8531:825:0",
+            "src": "8577:871:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
@@ -23995,7 +23995,7 @@
             "body": {
               "id": 952,
               "nodeType": "Block",
-              "src": "9521:417:0",
+              "src": "9613:463:0",
               "statements": [
                 {
                   "assignments": [
@@ -24008,7 +24008,7 @@
                       "name": "currentGame",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9531:24:0",
+                      "src": "9623:24:0",
                       "stateVariable": false,
                       "storageLocation": "storage",
                       "typeDescriptions": {
@@ -24021,7 +24021,7 @@
                         "name": "Game",
                         "nodeType": "UserDefinedTypeName",
                         "referencedDeclaration": 189,
-                        "src": "9531:4:0",
+                        "src": "9623:4:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game"
@@ -24041,7 +24041,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 149,
-                      "src": "9558:6:0",
+                      "src": "9650:6:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_mapping$_t_uint256_$_t_struct$_Game_$189_storage_$",
                         "typeString": "mapping(uint256 => struct NumberGame.Game storage ref)"
@@ -24055,7 +24055,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 899,
-                      "src": "9565:10:0",
+                      "src": "9657:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -24066,14 +24066,14 @@
                     "isPure": false,
                     "lValueRequested": false,
                     "nodeType": "IndexAccess",
-                    "src": "9558:18:0",
+                    "src": "9650:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_Game_$189_storage",
                       "typeString": "struct NumberGame.Game storage ref"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9531:45:0"
+                  "src": "9623:45:0"
                 },
                 {
                   "assignments": [
@@ -24086,7 +24086,7 @@
                       "name": "depositAmount",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9586:21:0",
+                      "src": "9678:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -24097,7 +24097,7 @@
                         "id": 913,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9586:7:0",
+                        "src": "9678:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -24117,7 +24117,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 1122,
-                      "src": "9610:3:0",
+                      "src": "9702:3:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_magic_message",
                         "typeString": "msg"
@@ -24131,14 +24131,14 @@
                     "memberName": "value",
                     "nodeType": "MemberAccess",
                     "referencedDeclaration": null,
-                    "src": "9610:9:0",
+                    "src": "9702:9:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9586:33:0"
+                  "src": "9678:33:0"
                 },
                 {
                   "expression": {
@@ -24151,7 +24151,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 899,
-                        "src": "9647:10:0",
+                        "src": "9752:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -24164,7 +24164,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 914,
-                        "src": "9659:13:0",
+                        "src": "9776:13:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -24179,7 +24179,7 @@
                           "nodeType": "Identifier",
                           "overloadedDeclarations": [],
                           "referencedDeclaration": 908,
-                          "src": "9674:11:0",
+                          "src": "9803:11:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                             "typeString": "struct NumberGame.Game storage pointer"
@@ -24193,7 +24193,7 @@
                         "memberName": "bankerAddress",
                         "nodeType": "MemberAccess",
                         "referencedDeclaration": 156,
-                        "src": "9674:25:0",
+                        "src": "9803:25:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_address",
                           "typeString": "address"
@@ -24220,7 +24220,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 375,
-                      "src": "9629:17:0",
+                      "src": "9721:17:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_nonpayable$_t_uint256_$_t_uint256_$_t_address_$returns$__$",
                         "typeString": "function (uint256,uint256,address)"
@@ -24234,7 +24234,7 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "9629:71:0",
+                    "src": "9721:117:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$__$",
                       "typeString": "tuple()"
@@ -24242,7 +24242,7 @@
                   },
                   "id": 924,
                   "nodeType": "ExpressionStatement",
-                  "src": "9629:71:0"
+                  "src": "9721:117:0"
                 },
                 {
                   "assignments": [
@@ -24256,7 +24256,7 @@
                       "name": "winnerName",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9711:18:0",
+                      "src": "9849:18:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -24267,7 +24267,7 @@
                         "id": 925,
                         "name": "bytes32",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9711:7:0",
+                        "src": "9849:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_bytes32",
                           "typeString": "bytes32"
@@ -24282,7 +24282,7 @@
                       "name": "winningNumber",
                       "nodeType": "VariableDeclaration",
                       "scope": 953,
-                      "src": "9731:21:0",
+                      "src": "9869:21:0",
                       "stateVariable": false,
                       "storageLocation": "default",
                       "typeDescriptions": {
@@ -24293,7 +24293,7 @@
                         "id": 927,
                         "name": "uint256",
                         "nodeType": "ElementaryTypeName",
-                        "src": "9731:7:0",
+                        "src": "9869:7:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -24314,7 +24314,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 899,
-                        "src": "9770:10:0",
+                        "src": "9908:10:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_uint256",
                           "typeString": "uint256"
@@ -24333,7 +24333,7 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 493,
-                      "src": "9756:13:0",
+                      "src": "9894:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_function_internal_view$_t_uint256_$returns$_t_bytes32_$_t_uint256_$",
                         "typeString": "function (uint256) view returns (bytes32,uint256)"
@@ -24347,14 +24347,14 @@
                     "lValueRequested": false,
                     "names": [],
                     "nodeType": "FunctionCall",
-                    "src": "9756:25:0",
+                    "src": "9894:25:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_tuple$_t_bytes32_$_t_uint256_$",
                       "typeString": "tuple(bytes32,uint256)"
                     }
                   },
                   "nodeType": "VariableDeclarationStatement",
-                  "src": "9710:71:0"
+                  "src": "9848:71:0"
                 },
                 {
                   "expression": {
@@ -24373,7 +24373,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9791:11:0",
+                        "src": "9929:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -24387,7 +24387,7 @@
                       "memberName": "winnerName",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 166,
-                      "src": "9791:22:0",
+                      "src": "9929:22:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_bytes32",
                         "typeString": "bytes32"
@@ -24402,13 +24402,13 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 926,
-                      "src": "9816:10:0",
+                      "src": "9954:10:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_bytes32",
                         "typeString": "bytes32"
                       }
                     },
-                    "src": "9791:35:0",
+                    "src": "9929:35:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
@@ -24416,7 +24416,7 @@
                   },
                   "id": 938,
                   "nodeType": "ExpressionStatement",
-                  "src": "9791:35:0"
+                  "src": "9929:35:0"
                 },
                 {
                   "expression": {
@@ -24435,7 +24435,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9836:11:0",
+                        "src": "9974:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -24449,7 +24449,7 @@
                       "memberName": "winnerNumber",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 170,
-                      "src": "9836:24:0",
+                      "src": "9974:24:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -24464,13 +24464,13 @@
                       "nodeType": "Identifier",
                       "overloadedDeclarations": [],
                       "referencedDeclaration": 928,
-                      "src": "9863:13:0",
+                      "src": "10001:13:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9836:40:0",
+                    "src": "9974:40:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -24478,7 +24478,7 @@
                   },
                   "id": 944,
                   "nodeType": "ExpressionStatement",
-                  "src": "9836:40:0"
+                  "src": "9974:40:0"
                 },
                 {
                   "expression": {
@@ -24497,7 +24497,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 908,
-                        "src": "9886:11:0",
+                        "src": "10024:11:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_struct$_Game_$189_storage_ptr",
                           "typeString": "struct NumberGame.Game storage pointer"
@@ -24511,7 +24511,7 @@
                       "memberName": "winnerTimestamp",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": 172,
-                      "src": "9886:27:0",
+                      "src": "10024:27:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
@@ -24528,7 +24528,7 @@
                         "nodeType": "Identifier",
                         "overloadedDeclarations": [],
                         "referencedDeclaration": 1112,
-                        "src": "9916:5:0",
+                        "src": "10054:5:0",
                         "typeDescriptions": {
                           "typeIdentifier": "t_magic_block",
                           "typeString": "block"
@@ -24542,13 +24542,13 @@
                       "memberName": "timestamp",
                       "nodeType": "MemberAccess",
                       "referencedDeclaration": null,
-                      "src": "9916:15:0",
+                      "src": "10054:15:0",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "src": "9886:45:0",
+                    "src": "10024:45:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -24556,7 +24556,7 @@
                   },
                   "id": 951,
                   "nodeType": "ExpressionStatement",
-                  "src": "9886:45:0"
+                  "src": "10024:45:0"
                 }
               ]
             },
@@ -24576,14 +24576,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 72,
-                  "src": "9433:16:0",
+                  "src": "9525:16:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$__$",
                     "typeString": "modifier ()"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "9433:16:0"
+                "src": "9525:16:0"
               },
               {
                 "arguments": [
@@ -24594,7 +24594,7 @@
                     "nodeType": "Identifier",
                     "overloadedDeclarations": [],
                     "referencedDeclaration": 145,
-                    "src": "9481:18:0",
+                    "src": "9573:18:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -24609,14 +24609,14 @@
                   "nodeType": "Identifier",
                   "overloadedDeclarations": [],
                   "referencedDeclaration": 86,
-                  "src": "9458:22:0",
+                  "src": "9550:22:0",
                   "typeDescriptions": {
                     "typeIdentifier": "t_modifier$_t_uint256_$",
                     "typeString": "modifier (uint256)"
                   }
                 },
                 "nodeType": "ModifierInvocation",
-                "src": "9458:42:0"
+                "src": "9550:42:0"
               }
             ],
             "name": "snapshotWinner",
@@ -24631,7 +24631,7 @@
                   "name": "_gameRound",
                   "nodeType": "VariableDeclaration",
                   "scope": 953,
-                  "src": "9390:18:0",
+                  "src": "9482:18:0",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -24642,7 +24642,7 @@
                     "id": 898,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "9390:7:0",
+                    "src": "9482:7:0",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -24652,27 +24652,27 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "9389:20:0"
+              "src": "9481:20:0"
             },
             "payable": true,
             "returnParameters": {
               "id": 906,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "9521:0:0"
+              "src": "9613:0:0"
             },
             "scope": 954,
-            "src": "9366:572:0",
+            "src": "9458:618:0",
             "stateMutability": "payable",
             "superFunction": null,
             "visibility": "public"
           }
         ],
         "scope": 955,
-        "src": "613:9332:0"
+        "src": "613:9470:0"
       }
     ],
-    "src": "0:9946:0"
+    "src": "0:10084:0"
   },
   "compiler": {
     "name": "solc",
@@ -24680,5 +24680,5 @@
   },
   "networks": {},
   "schemaVersion": "2.0.1",
-  "updatedAt": "2018-10-31T05:21:46.257Z"
+  "updatedAt": "2018-10-31T23:23:07.061Z"
 }
