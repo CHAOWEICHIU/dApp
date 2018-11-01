@@ -1,10 +1,13 @@
 const express = require('express')
+const graphqlHTTP = require('express-graphql')
 const bodyParser = require('body-parser')
 const next = require('next')
 
+const MyGraphQLSchema = require('./lib/schema')
+
 const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev })
-const handle = app.getRequestHandler();
+const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
   const server = express()
@@ -12,6 +15,13 @@ app.prepare().then(() => {
   server.use(bodyParser.json())
 
   // Server-side
+
+
+  server.use('/graphql', graphqlHTTP({
+    schema: MyGraphQLSchema,
+    graphiql: true,
+  }))
+
 
   server.get('/game/:id', (req, res) => {
     if (req.params.id === 'list' || !req.params.id) {

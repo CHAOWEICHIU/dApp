@@ -1,6 +1,6 @@
-import Big from 'big.js'
+const Big = require('big.js')
 
-export const RM = {
+const RM = {
   ROUND_DOWN: 0,
   ROUND_HALF_UP: 1,
   ROUND_HALF_EVEN: 2,
@@ -30,22 +30,37 @@ const ComparisonGenerator = op => (
   (arg1, arg2) => (Big(arg1)[op](Big(arg2)))
 )
 
-export const add = catchWraper(OperationGenerator('plus'))
-export const sub = catchWraper(OperationGenerator('minus'))
-export const mul = catchWraper(OperationGenerator('times'))
-export const div = catchWraper(OperationGenerator('div'))
-export const mod = catchWraper(OperationGenerator('mod'))
+const add = catchWraper(OperationGenerator('plus'))
+const sub = catchWraper(OperationGenerator('minus'))
+const mul = catchWraper(OperationGenerator('times'))
+const div = catchWraper(OperationGenerator('div'))
+const mod = catchWraper(OperationGenerator('mod'))
 
-export const eq = catchWraper(ComparisonGenerator('eq'))
-export const gte = catchWraper(ComparisonGenerator('gte'))
-export const lte = catchWraper(ComparisonGenerator('lte'))
-export const gt = catchWraper(ComparisonGenerator('gt'))
-export const lt = catchWraper(ComparisonGenerator('lt'))
+const eq = catchWraper(ComparisonGenerator('eq'))
+const gte = catchWraper(ComparisonGenerator('gte'))
+const lte = catchWraper(ComparisonGenerator('lte'))
+const gt = catchWraper(ComparisonGenerator('gt'))
+const lt = catchWraper(ComparisonGenerator('lt'))
 
-export const round = catchWraper((num, precision = 10, type = RM.ROUND_DOWN) => (
+const round = catchWraper((num, precision = 10, type = RM.ROUND_DOWN) => (
   Big(num).round(precision, type).toFixed()
 ))
 
-export const toPrecision = catchWraper(
+const toPrecision = catchWraper(
   (num, precision) => Big(num).toPrecision(precision),
 )
+
+module.exports = {
+  add,
+  sub,
+  mul,
+  div,
+  mod,
+  eq,
+  lte,
+  gt,
+  lt,
+  gte,
+  round,
+  toPrecision,
+}
