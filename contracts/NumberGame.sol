@@ -28,7 +28,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x7d7d7F2D5329Bf96Ac2Bcc906033c24D0c1502d1;
+    address constant playbookContractAddress_ = 0x1b7baC0740E11e38f95D08C0Be3cd979cE20a0C8;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
     
@@ -62,7 +62,7 @@ contract NumberGame is GameEvents {
     uint256 public keyPrice_ = 0.5 ether;
     uint256 public gameActivationFee_ = 1 ether;
     uint256 public totalGameCount_ = 0;
-    uint256 public currentLottryPot_ = 0;
+    uint256 public currentLotteryPot_ = 0;
     uint256 public keyRevealFee_ = 0.2 ether;
     uint256 public snapshotWinnerFee_ = 5 ether;
 
@@ -126,14 +126,14 @@ contract NumberGame is GameEvents {
     {
         address depositPerson = msg.sender;
         if(random() > 50) {
-            PlayerBook.deposit.value(currentLottryPot_)(depositPerson);
-            currentLottryPot_ = 0;
+            PlayerBook.deposit.value(currentLotteryPot_)(depositPerson);
+            currentLotteryPot_ = 0;
             return (true);
             emit onLotteryWin(
                 depositPerson,
                 PlayerBook.getPlayerName(depositPerson),
                 block.timestamp,
-                currentLottryPot_
+                currentLotteryPot_
             );
         }
         return (false);
@@ -154,7 +154,7 @@ contract NumberGame is GameEvents {
         uint256 gameWinningPotAmount = depositAmount.sub(goOutAmount).sub(gameLotteryPotAmount);
         
         games_[_gameRound].totalAmount = games_[_gameRound].totalAmount.add(gameWinningPotAmount);
-        currentLottryPot_ = currentLottryPot_.add(gameLotteryPotAmount);
+        currentLotteryPot_ = currentLotteryPot_.add(gameLotteryPotAmount);
         PlayerBook.deposit.value(goOutAmount)(_personAddress);
     }
     
