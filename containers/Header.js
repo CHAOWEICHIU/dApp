@@ -64,7 +64,7 @@ const RightArea = styled(LeftArea)`
 const Header = styled.div`
   background: rgba(6,9,14,0.95);
   width:100vw;
-  height:70px;
+  height:85px;
   display:flex;
   position: relative;
 `
@@ -201,7 +201,7 @@ class HeaderComponent extends React.PureComponent {
                       {name}
                     </GrayText>
                     <PriceIndicator amount={toPrecision(claimable, 2)} label="claimable">
-                      {toPrecision(claimable, 6)}
+                      {toPrecision(claimable, 2)}
                       {' '}
                       ETH
                     </PriceIndicator>
@@ -225,15 +225,15 @@ class HeaderComponent extends React.PureComponent {
                 )
               }
               const { wallet: { address, balance } } = data
-              const showLength = 4
+              const showLength = 2
               const shortAddress = `${address.slice(0, showLength)}...${address.slice(address.length - showLength, address.length + 1)}`
               return (
                 <WalletInfoWrapper>
                   <GrayText>
                     {shortAddress}
                   </GrayText>
-                  <PriceIndicator amount={toPrecision(balance, 4)} label="balance">
-                    {toPrecision(balance, 6)}
+                  <PriceIndicator amount={toPrecision(balance, 2)} label="balance">
+                    {toPrecision(balance, 4)}
                     {' '}
                     ETH
                   </PriceIndicator>

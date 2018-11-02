@@ -192,9 +192,7 @@ class RegisterUserPage extends React.PureComponent {
                       </Query>
                     </Section>
                   </SectionWrapper>
-
                 ) }
-
 
                 { registered && (
                 <SectionWrapper>
@@ -209,7 +207,7 @@ class RegisterUserPage extends React.PureComponent {
                   </Section>
                 </SectionWrapper>
                 ) }
-                { registered && (
+                { registered && affiliate.user && (
                 <SectionWrapper>
                   <Section sectionTitle="Laff Info">
                     <SectionImgWrapper>
@@ -223,7 +221,6 @@ class RegisterUserPage extends React.PureComponent {
                     <SectionContent>{affiliate.user.name}</SectionContent>
                     <SectionLabel>Claimable</SectionLabel>
                     <SectionContent>{affiliate.user.claimable}</SectionContent>
-
                   </Section>
                 </SectionWrapper>
                 ) }

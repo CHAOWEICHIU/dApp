@@ -24,8 +24,6 @@ const SectionContainer = styled.div`
   animation: ${() => fadeIn} 1s ease-in-out both;
 `
 
-
-
 const SectionTitleText = styled.div`
   color: rgb(119,136,153);
   background: rgba(6,9,14,0.95);
@@ -50,9 +48,9 @@ export const SectionContent = styled.div`
 `
 
 export const SectionWrapper = styled.div`
-  padding: 30px;
+  margin: 30px; 
   display: flex;
-  width: 100%;
+  width: calc(100% - 60px);
   justify-content: center;
   flex-wrap: wrap;
 `

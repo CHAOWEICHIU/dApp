@@ -12,7 +12,8 @@
     "build-contract": "truffle compile",
     "migrate-contract-dev": "truffle migrate --network development --reset",
     "migrate-contract-rinkeby": "truffle migrate --network rinkeby --reset",
-    "truffle-test": "truffle test"
+    "truffle-test": "truffle test",
+    "lint": "eslint"
   },
   "keywords": [],
   "author": "",
