@@ -35,7 +35,7 @@ app.prepare().then(() => {
   })
 
   /* eslint-disable no-console */
-  server.listen(3000, (err) => {
+  server.listen(process.env.PORT || 3000, (err) => {
     if (err) throw err
     console.log('Server ready on http://localhost:3000');
   })
