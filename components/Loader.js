@@ -1,12 +1,11 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 import styled, { keyframes } from 'styled-components'
-
-const docs = [1, 2, 3, 4, 5]
+import range from 'lodash/range'
 
 const CenterComponent = styled.div`
   display:flex;
   justify-content:center;
-  padding-top:100px;
 `
 
 const resizeAnimation = keyframes`
@@ -17,8 +16,8 @@ const resizeAnimation = keyframes`
 `
 
 const Dot = styled.div`
-  width:18px;
-  height:18px;
+  width:${props => props.size}px;
+  height:${props => props.size}px;
   background-color:white;
   border-radius:100%;
   margin:3px;
@@ -26,10 +25,15 @@ const Dot = styled.div`
   animation-delay:${props => `${props.delay}s`};
 `
 
-const ReactStarter = () => (
+const Loader = ({ size = 4, dotsCount = 3 }) => (
   <CenterComponent>
-    {docs.map((d, di) => <Dot delay={di} key={`${d}_dot`} />)}
+    {range(1, dotsCount + 1).map((d, di) => <Dot size={size * 4} delay={di} key={`${d}_dot`} />)}
   </CenterComponent>
 )
 
-export default ReactStarter
+Loader.propTypes = {
+  size: PropTypes.number, /* eslint-disable-line */
+  dotsCount: PropTypes.number, /* eslint-disable-line */
+}
+
+export default Loader

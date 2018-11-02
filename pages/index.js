@@ -2,6 +2,7 @@ import React from 'react'
 import styled, { keyframes } from 'styled-components'
 import Link from 'next/link'
 import Layout from '../components/Layout'
+import Header from '../containers/Header'
 
 const BlockChainWrapper = styled.div`
 display:flex;
@@ -232,14 +233,14 @@ height: 30px;
 
 const Profit = 10000000
 
-class MainPage extends React.Component {
+class MainPage extends React.PureComponent {
   state = {
     number: 0,
   }
 
-  componentDidMount() {
-    this.startToIncreaseNumber()
-  }
+  // componentDidMount() {
+  //   this.startToIncreaseNumber()
+  // }
 
   startToIncreaseNumber = () => {
     const interval = setInterval(() => {
@@ -258,6 +259,7 @@ class MainPage extends React.Component {
     } = this.state
     return (
       <Layout>
+        <Header />
         <WrapperA>
           <WordWrapper>
             <ETH src="/static/eth.svg" />
