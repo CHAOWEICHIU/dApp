@@ -2,28 +2,21 @@ import React from 'react'
 import styled from 'styled-components'
 import PropTypes from 'prop-types'
 import Link from 'next/link'
-import withContracts from '../../lib/withContracts'
-import Section from '../../components/Section'
+import { compose } from 'recompose'
+import { Query } from 'react-apollo'
+import withPolling from '../../lib/withPolling'
+import { GET_WALLET_USER, GET_PLAYERBOOK_PLAYER } from '../../lib/queries'
+import Header from '../../containers/Header'
+import Section, {
+  SectionContent,
+  SectionWrapper,
+  SectionLabel,
+  SectionImgWrapper,
+} from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
 import Loader from '../../components/Loader'
 
-const SectionWrapper = styled.div`
-  padding: 10px;
-  display: flex;
-  width: 100%;
-  justify-content: center;
-`
-
-const SectionLabel = styled.div`
-  color: gray;
-  font-size: 14px;
-`
-const SectionContent = styled.div`
-  color: white;
-  font-size: 16px;
-  margin-bottom: 10px;
-`
 const Spacer = styled.div`
   width: 100%;
   height: 40px;
@@ -52,227 +45,203 @@ const Warning = styled.div`
   color: #FF6491;
 `
 
+const UserImg = styled.img`
+  width: 80%;
+`
+
 class RegisterUserPage extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = {
-      user: {
-        address: '',
-        balance: '0',
-        name: '',
-        claimable: '0',
-        laff: '',
-      },
-      laff: {
-        address: '',
-        balance: '0',
-        name: '',
-        claimable: '0',
-        laff: '',
-      },
       tempName: '',
-      nameTaken: false,
       tempLaffId: '',
-      laffIdExist: true,
-      loadingUser: true,
     }
   }
 
-  componentDidMount() {
-    this.polling = setInterval(this.updateUserInfo, 2000)
-  }
-
-  updateUserInfo = () => {
-    const {
-      getCurrentMetaAccount,
-      contractMethods: {
-        getUserInformationWithAddress,
-        getUserInformationWithId,
-      },
-    } = this.props
-    getCurrentMetaAccount()
-      .then(accAddress => getUserInformationWithAddress(accAddress))
-      .then((userInfo) => {
-        if (!userInfo.name) {
-          return this.setState({
-            user: userInfo,
-            loadingUser: false,
-          })
-        }
-        return getUserInformationWithId(userInfo.laff)
-          .then((laffInfo) => {
-            this.setState({
-              user: userInfo,
-              laff: laffInfo,
-              loadingUser: false,
-            })
-          })
-      })
-  }
-
   registerUser = () => {
-    const { contractMethods: { registerUser } } = this.props
-    const { tempName, tempLaffId, user } = this.state
+    const { contractMethods: { registerUser }, walletAddress } = this.props
+    const { tempName, tempLaffId } = this.state
     registerUser({
       name: tempName,
       laffId: tempLaffId,
-      accountAddress: user.address,
+      accountAddress: walletAddress,
     })
-      .then(() => this.updateUserInfo())
+      .then(() => ({}))
       .catch(err => console.log('err', err))
   }
 
   render() {
     const {
-      tempName,
-      user,
-      laff,
-      nameTaken,
-      tempLaffId,
-      laffIdExist,
-      loadingUser,
-    } = this.state
-    const {
-      contractMethods: {
-        playerNameTaken,
-        playerIdExist,
-      },
+      walletAddress,
     } = this.props
-    const registered = user.name
-    const validInputs = (!nameTaken && laffIdExist && tempName && tempLaffId)
 
-    if (loadingUser) {
-      return (
-        <Layout>
-          <Loader />
-        </Layout>
-      )
-    }
+    const {
+      tempName,
+      tempLaffId,
+    } = this.state
+
 
     return (
       <Layout>
-        <SectionWrapper>
-          <Section sectionTitle="Current Wallet Info">
-            <SectionLabel>Address</SectionLabel>
-            <SectionContent>{user.address}</SectionContent>
-            <SectionLabel>Balance</SectionLabel>
-            <SectionContent>{user.balance}</SectionContent>
-          </Section>
-          { registered && (
-            <Section sectionTitle="Your Info">
-              <SectionLabel>Name</SectionLabel>
-              <SectionContent>{user.name}</SectionContent>
-              <SectionLabel>Claimable</SectionLabel>
-              <SectionContent>{user.claimable}</SectionContent>
-            </Section>
-          ) }
-        </SectionWrapper>
-        { registered && (
-          <SectionWrapper>
-            <Section sectionTitle="Game">
-              <SectionLabel>Notice</SectionLabel>
-              <SectionContent>Ready for your first game?</SectionContent>
-              <Link prefetch href="/game/list">
-                <StyledButton>
-                  Game Center
-                </StyledButton>
-              </Link>
-            </Section>
-          </SectionWrapper>
-        ) }
-        { registered && (
-          <SectionWrapper>
-            <Section sectionTitle="Laff Info">
-              <SectionLabel>Address</SectionLabel>
-              <SectionContent>{laff.address}</SectionContent>
-              <SectionLabel>Balance</SectionLabel>
-              <SectionContent>{laff.balance}</SectionContent>
-              <SectionLabel>Name</SectionLabel>
-              <SectionContent>{laff.name ? laff.name : ''}</SectionContent>
-              <SectionLabel>Claimable</SectionLabel>
-              <SectionContent>{laff.claimable}</SectionContent>
-            </Section>
-          </SectionWrapper>
-        ) }
+        <Header />
+        <Query
+          query={GET_WALLET_USER}
+          variables={{ address: walletAddress }}
+          skip={!walletAddress}
+        >
+          {({ data, loading }) => {
+            if (loading || !data) {
+              return (
+                <React.Fragment>
+                  <Spacer />
+                  <Loader size={5} dotsCount={5} />
+                </React.Fragment>
+              )
+            }
+            const { wallet: { user } } = data
+            const { affiliate } = user
+            const registered = user
+            return (
+              <React.Fragment>
+                { !registered && (
+                  <SectionWrapper>
+                    <Section sectionTitle="Register Form">
+                      <SectionLabel>Name</SectionLabel>
+                      <Input
+                        value={tempName}
+                        onChange={e => this.setState({ tempName: e.target.value })}
+                      />
+                      <Query
+                        query={GET_PLAYERBOOK_PLAYER}
+                        variables={{ name: tempName }}
+                        skip={!tempName}
+                      >
+                        {(queryResponse) => {
+                          if (!tempName) return null
+                          if (queryResponse.loading || !queryResponse.data) {
+                            return <Loader size={3} />
+                          }
+                          if (!queryResponse.data.playerBook.player) return null
+                          return (
+                            <Warning>
+                            Name Has Been taken
+                            </Warning>
+                          )
+                        }}
+                      </Query>
+                      <Spacer />
+                      <SectionLabel>Laff Id</SectionLabel>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={tempLaffId}
+                        onChange={e => this.setState({ tempLaffId: e.target.value })}
+                      />
+                      <Query
+                        query={GET_PLAYERBOOK_PLAYER}
+                        variables={{ id: Number(tempLaffId) }}
+                        skip={!tempLaffId}
+                      >
+                        {(queryResponse) => {
+                          if (!tempLaffId) return null
+                          if (queryResponse.loading) {
+                            return <Loader size={3} />
+                          }
+                          if (queryResponse.data.playerBook.player) return null
+                          return (
+                            <Warning>
+                            Id is not exist
+                            </Warning>
+                          )
+                        }}
+                      </Query>
+                      <Spacer />
+                      <Query
+                        query={GET_PLAYERBOOK_PLAYER}
+                        variables={{ name: tempName }}
+                        skip={!tempName}
+                      >
+                        {queryResponseFirst => (
+                          <Query
+                            query={GET_PLAYERBOOK_PLAYER}
+                            variables={{ id: Number(tempLaffId) }}
+                            skip={!tempLaffId}
+                          >
+                            {(queryResponseSecond) => {
+                              const canSubmit = queryResponseFirst.data
+                              && queryResponseSecond.data
+                              && (
+                                !queryResponseFirst.data.playerBook.player
+                                && queryResponseSecond.data.playerBook.player
+                              )
+                              return (
+                                <StyledButton
+                                  disable={!canSubmit}
+                                  onClick={() => {
+                                    if (canSubmit) {
+                                      this.registerUser()
+                                    }
+                                  }}
+                                >
+                                Register
+                                </StyledButton>
+                              )
+                            }}
+                          </Query>
+                        )}
+                      </Query>
+                    </Section>
+                  </SectionWrapper>
 
-        { !registered && (
-          <SectionWrapper>
-            <Section sectionTitle="Register Form">
-              <SectionLabel>Name</SectionLabel>
-              <Input
-                value={tempName}
-                onChange={(e) => {
-                  const newValue = e.target.value
-                  this.setState({
-                    tempName: newValue,
-                  })
-                  playerNameTaken(newValue)
-                    .then((taken) => {
-                      if (taken && nameTaken === false) {
-                        this.setState({
-                          nameTaken: true,
-                        })
-                      }
-                      if (!taken && nameTaken === true) {
-                        this.setState({
-                          nameTaken: false,
-                        })
-                      }
-                    })
-                }}
-              />
-              { nameTaken && (
-                <Warning>
-                  Name Has Been taken
-                </Warning>
-              ) }
-              <Spacer />
-              <SectionLabel>Laff Id</SectionLabel>
-              <Input
-                type="number"
-                min="0"
-                value={tempLaffId}
-                onChange={(e) => {
-                  const newValue = e.target.value
-                  this.setState({
-                    tempLaffId: newValue,
-                  })
-                  playerIdExist(newValue)
-                    .then((exist) => {
-                      if (!exist && laffIdExist) {
-                        this.setState({ laffIdExist: false })
-                      }
-                      if (exist && !laffIdExist) {
-                        this.setState({ laffIdExist: true })
-                      }
-                    })
-                }}
-              />
-              { !laffIdExist && (
-                <Warning>
-                  Id is not exist
-                </Warning>
-              ) }
-              <Spacer />
-              <StyledButton
-                disable={!validInputs}
-                onClick={() => this.registerUser()}
-              >
-                Register
-              </StyledButton>
-            </Section>
-          </SectionWrapper>
-        ) }
+                ) }
+
+
+                { registered && (
+                <SectionWrapper>
+                  <Section sectionTitle="Game">
+                    <SectionLabel>Notice</SectionLabel>
+                    <SectionContent>Ready for your first game?</SectionContent>
+                    <Link prefetch href="/game/list">
+                      <StyledButton>
+                        Game Center
+                      </StyledButton>
+                    </Link>
+                  </Section>
+                </SectionWrapper>
+                ) }
+                { registered && (
+                <SectionWrapper>
+                  <Section sectionTitle="Laff Info">
+                    <SectionImgWrapper>
+                      <UserImg src={affiliate.user.image} />
+                    </SectionImgWrapper>
+                    <SectionLabel>Address</SectionLabel>
+                    <SectionContent>{affiliate.address}</SectionContent>
+                    <SectionLabel>Balance</SectionLabel>
+                    <SectionContent>{affiliate.balance}</SectionContent>
+                    <SectionLabel>Name</SectionLabel>
+                    <SectionContent>{affiliate.user.name}</SectionContent>
+                    <SectionLabel>Claimable</SectionLabel>
+                    <SectionContent>{affiliate.user.claimable}</SectionContent>
+
+                  </Section>
+                </SectionWrapper>
+                ) }
+
+              </React.Fragment>
+            )
+          }}
+        </Query>
       </Layout>
     )
   }
 }
 
 RegisterUserPage.propTypes = {
-  contracts: PropTypes.object, /* eslint-disable-line */
-  web3: PropTypes.object, /* eslint-disable-line */
   contractMethods: PropTypes.object, /* eslint-disable-line */
-  getCurrentMetaAccount: PropTypes.func.isRequired,
+  walletAddress: PropTypes.string, /* eslint-disable-line */
 }
 
-export default withContracts(RegisterUserPage)
+export default compose(
+  withPolling,
+)(RegisterUserPage)

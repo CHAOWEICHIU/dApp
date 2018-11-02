@@ -4,7 +4,6 @@ import styled from 'styled-components'
 import Link from 'next/link'
 import { compose } from 'recompose'
 import { Query } from 'react-apollo'
-import isEmpty from 'lodash/isEmpty'
 import Loader from '../components/Loader'
 import { toPrecision } from '../utils/calculation'
 import withPolling from '../lib/withPolling'
@@ -172,7 +171,7 @@ class HeaderComponent extends React.PureComponent {
               if (loading || !data) return null
               const { wallet: { user } } = data
               return Links
-                .filter(x => (isEmpty(user.name) ? x.name === 'Register' : x.name !== 'Register'))
+                .filter(x => (!user ? x.name === 'Register' : x.name !== 'Register'))
                 .map(link => (
                   <Link prefetch href={link.url} key={link.name}>
                     <StyledLink>{link.name}</StyledLink>
@@ -192,8 +191,9 @@ class HeaderComponent extends React.PureComponent {
               if (loading || !data) {
                 return null
               }
-              const { wallet: { user: { name, claimable, image } } } = data
-              if (!name) return null
+              const { wallet: { user } } = data
+              if (!user) return null
+              const { name, claimable, image } = user
               return (
                 <React.Fragment>
                   <WalletInfoWrapper>
