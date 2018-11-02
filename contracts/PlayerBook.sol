@@ -13,7 +13,7 @@ contract PlayerBookEvents {
 contract PlayerBook is PlayerBookEvents {
     using SafeMath for uint256;
 
-    uint256 public totalPlayerCount = 0;                    // total players
+    uint256 public totalPlayerCount = 1;                    // total players
     uint256 public registrationFee_ = 10 finney;            // price to register a name
     mapping (address => uint256) public pIDxAddr_;          // (addr => pID) returns player id by address
     mapping (bytes32 => uint256) public pIDxName_;          // (name => pID) returns player id by name
@@ -35,10 +35,10 @@ contract PlayerBook is PlayerBookEvents {
     constructor()
         public
     {
-        plyr_[0].addr = msg.sender;
-        plyr_[0].name = "wayne";
-        pIDxAddr_[msg.sender] = 0;
-        pIDxName_["wayne"] = 0;
+        plyr_[1].addr = msg.sender;
+        plyr_[1].name = "wayne";
+        pIDxAddr_[msg.sender] = 1;
+        pIDxName_["wayne"] = 1;
     }
 
     function getPlayerName(address _addr)
