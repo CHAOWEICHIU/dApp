@@ -6,7 +6,7 @@ import {
 } from '../../components/Mushroom'
 import MushroomHeader from '../../containers/MushroomHeader'
 
-class MushroomHomePage extends React.PureComponent {
+class MushroomMallPage extends React.PureComponent {
   static async getInitialProps(ctx) {
     return {
       params: {
@@ -19,16 +19,17 @@ class MushroomHomePage extends React.PureComponent {
     const { params } = this.props
     return (
       <Layout mushroom>
-        <Container src="/static/mushroom-landing-background.png">
+        <Container src="/static/mushroom-mall-background.png">
           <MushroomHeader pathname={params.url} />
+          Mall
         </Container>
       </Layout>
     )
   }
 }
 
-MushroomHomePage.propTypes = {
+MushroomMallPage.propTypes = {
   params: PropTypes.any, /* eslint-disable-line */
 }
 
-export default MushroomHomePage
+export default MushroomMallPage

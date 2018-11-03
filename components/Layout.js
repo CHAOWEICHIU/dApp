@@ -10,13 +10,14 @@ const Background = styled.div`
         background-repeat: no-repeat;
         background-position: center;
         background-size: cover;
+        overflow: hidden;
       ` : `
-        background: black;  
+        background: black;
+        overflow: auto;
       `
   )}
   height: 100vh;
   width: 100vw;
-  overflow: auto;
   color: white;
 `
 

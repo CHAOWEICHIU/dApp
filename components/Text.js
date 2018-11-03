@@ -13,6 +13,12 @@ export const H2 = styled.h2`
   color: #FFFFFF;
 `
 
+export const H3 = styled.h2`
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: #FFFFFF;
+`
+
 export const P = styled.p`
   font-size: 16px;
   letter-spacing: 1.3px;
