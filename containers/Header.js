@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { compose } from 'recompose'
 import { Query } from 'react-apollo'
 import Loader from '../components/Loader'
-import { toPrecision } from '../utils/calculation'
 import withPolling from '../lib/withPolling'
 import { H2, P } from '../components/Text'
 import { GET_WALLET_USER } from '../lib/queries'
@@ -42,11 +41,13 @@ const LeftArea = styled.div`
   align-items:center;
   justify-content:flex-start;
   height:100%;
-  cursor: pointer;
-  opacity: 0.7;
-  &:hover {
-    opacity: 1;
-  }
+  ${props => !props.mushroom && `
+    cursor: pointer;
+    opacity: 0.7;
+    &:hover {
+      opacity: 1;
+    }
+  `}
 `
 const CenterArea = styled.div`
   position: absolute;
@@ -124,62 +125,76 @@ const PriceIndicator = styled(P)`
   padding: 5px 10px;
   transition: all 0.5s ease;
   width: 120px;
+  &:after {
+    position: absolute;
+    right: 10px;
+    content: ${props => `'${props.amount} ETH'`};
+    color: transparent;
+  }
   &:hover {
     color: transparent;
-    &:before {
-      position: absolute;
-      left: 0;
-      content: ${props => `'${props.label}'`};
-      margin-right: 5px;
-      font-size: 14px;
-      color: white;
-    }
     &:after {
-      position: absolute;
-      right: 0;
-      content: ${props => `'${props.amount} ETH'`};
-      font-size: 14px;
       color: white;
     }
   }
+`
+
+const MushroomImg = styled.img`
+  height: 90%;
+`
+const MushroomSubImg = styled.img`
+  height: 90%;
+  transform: scale(2.4) translate(4px, 6px);
 `
 
 class HeaderComponent extends React.PureComponent {
   render() {
     const {
       walletAddress,
+      mushroom = false,
     } = this.props
 
     return (
       <Header>
-        <LeftArea>
-          <Link prefetch href="/">
-            <React.Fragment>
-              <CoinGranpa />
-              <WhiteText>COIN</WhiteText>
-              <YellowText>GRANDPA</YellowText>
-            </React.Fragment>
-          </Link>
+        <LeftArea mushroom={mushroom}>
+          { mushroom
+            ? (
+              <React.Fragment>
+                <MushroomImg src="/static/mushroom-logo.png" />
+                <MushroomSubImg src="/static/mushroom-sub-logo.png" />
+              </React.Fragment>
+            )
+            : (
+              <Link prefetch href="/">
+                <React.Fragment>
+                  <CoinGranpa />
+                  <WhiteText>COIN</WhiteText>
+                  <YellowText>GRANDPA</YellowText>
+                </React.Fragment>
+              </Link>
+            )
+          }
         </LeftArea>
         <CenterArea>
-          <Query
-            query={GET_WALLET_USER}
-            variables={{ address: walletAddress }}
-            skip={!walletAddress}
-          >
-            {({ data, loading }) => {
-              if (loading || !data) return null
-              const { wallet: { user } } = data
-              return Links
-                .filter(x => (!user ? x.name === 'Register' : x.name !== 'Register'))
-                .map(link => (
-                  <Link prefetch href={link.url} key={link.name}>
-                    <StyledLink>{link.name}</StyledLink>
-                  </Link>
-                ))
-            }}
-          </Query>
-
+          { !mushroom && (
+            <Query
+              query={GET_WALLET_USER}
+              variables={{ address: walletAddress }}
+              skip={!walletAddress}
+            >
+              {({ data, loading }) => {
+                if (loading || !data) return null
+                const { wallet: { user } } = data
+                return Links
+                  .filter(x => (!user ? x.name === 'Register' : x.name !== 'Register'))
+                  .map(link => (
+                    <Link prefetch href={link.url} key={link.name}>
+                      <StyledLink>{link.name}</StyledLink>
+                    </Link>
+                  ))
+              }}
+            </Query>
+          ) }
         </CenterArea>
         <RightArea>
           <Query
@@ -200,8 +215,8 @@ class HeaderComponent extends React.PureComponent {
                     <GrayText>
                       {name}
                     </GrayText>
-                    <PriceIndicator amount={toPrecision(claimable, 2)} label="claimable">
-                      {toPrecision(claimable, 2)}
+                    <PriceIndicator amount={Number(claimable).toFixed(6)} label="claimable">
+                      {Number(claimable).toFixed(2)}
                       {' '}
                       ETH
                     </PriceIndicator>
@@ -232,8 +247,8 @@ class HeaderComponent extends React.PureComponent {
                   <GrayText>
                     {shortAddress}
                   </GrayText>
-                  <PriceIndicator amount={toPrecision(balance, 2)} label="balance">
-                    {toPrecision(balance, 4)}
+                  <PriceIndicator amount={Number(balance).toFixed(6)} label="balance">
+                    {Number(balance).toFixed(2)}
                     {' '}
                     ETH
                   </PriceIndicator>
@@ -251,6 +266,7 @@ class HeaderComponent extends React.PureComponent {
 
 HeaderComponent.propTypes = {
   walletAddress: PropTypes.string.isRequired,
+  mushroom: PropTypes.bool, // eslint-disable-line
 }
 
 export default compose(

@@ -1,13 +1,12 @@
 import React from 'react'
 import PropTypes from 'prop-types'
-import Header from '../../containers/Header'
 import Layout from '../../components/Layout'
 import {
   Container,
 } from '../../components/Mushroom'
 import MushroomHeader from '../../containers/MushroomHeader'
 
-class MushroomHomePage extends React.PureComponent {
+class MushroomUserPage extends React.PureComponent {
   static async getInitialProps(ctx) {
     return {
       params: {
@@ -20,17 +19,17 @@ class MushroomHomePage extends React.PureComponent {
     const { params } = this.props
     return (
       <Layout mushroom>
-        <Header mushroom />
-        <Container src="/static/mushroom-landing-background.png">
+        <Container src="/static/mushroom-mall-background.png">
           <MushroomHeader pathname={params.url} />
+          User
         </Container>
       </Layout>
     )
   }
 }
 
-MushroomHomePage.propTypes = {
+MushroomUserPage.propTypes = {
   params: PropTypes.any, /* eslint-disable-line */
 }
 
-export default MushroomHomePage
+export default MushroomUserPage
