@@ -63,7 +63,7 @@ const RightArea = styled(LeftArea)`
   opacity: 1;
 `
 const Header = styled.div`
-  background: rgba(6,9,14,0.95);
+  background: ${props => (props.mushroom ? '#FF789B' : 'rgba(6,9,14,0.95);')};
   width:100vw;
   height:85px;
   display:flex;
@@ -98,9 +98,10 @@ const WhiteText = styled(YellowText)`
 
 const CircularImg = styled.img`
   height: 30px;
+  width: 30px;
   border-radius: 100%;
-  padding: 10px;
-  background: #0B1C29;
+  padding: ${props => (props.mushroom ? '5px': '10px')};
+  background: ${props => (props.mushroom ? 'transparent' : '#0B1C29')};
   border: 1px white solid;
   margin-right: 15px;
   transition: all 0.4s ease;
@@ -115,8 +116,9 @@ const WalletInfoWrapper = styled.div`
   text-align: right;
 `
 
-const GrayText = styled(P)`
-  color: gray;
+const LabelText = styled(P)`
+  color: ${props => (props.mushroom ? 'white' : 'gray')};
+  font-size: 800;
 `
 
 const PriceIndicator = styled(P)`
@@ -125,16 +127,17 @@ const PriceIndicator = styled(P)`
   padding: 5px 10px;
   transition: all 0.5s ease;
   width: 120px;
+  color: ${props => (props.mushroom ? 'black' : 'white')};
   &:after {
     position: absolute;
     right: 10px;
-    content: ${props => `'${props.amount} ETH'`};
+    content: ${props => `'${props.amount} ${props.labelUint}'`};
     color: transparent;
   }
   &:hover {
     color: transparent;
     &:after {
-      color: white;
+      color: ${props => (props.mushroom ? 'black' : 'white')};
     }
   }
 `
@@ -155,7 +158,7 @@ class HeaderComponent extends React.PureComponent {
     } = this.props
 
     return (
-      <Header>
+      <Header mushroom={mushroom}>
         <LeftArea mushroom={mushroom}>
           { mushroom
             ? (
@@ -212,16 +215,24 @@ class HeaderComponent extends React.PureComponent {
               return (
                 <React.Fragment>
                   <WalletInfoWrapper>
-                    <GrayText>
+                    <LabelText mushroom={mushroom}>
                       {name}
-                    </GrayText>
-                    <PriceIndicator amount={Number(claimable).toFixed(6)} label="claimable">
+                    </LabelText>
+                    <PriceIndicator
+                      mushroom={mushroom}
+                      amount={Number(claimable).toFixed(6)}
+                      label="claimable"
+                      labelUint={mushroom ? 'GU' : 'ETH'}
+                    >
                       {Number(claimable).toFixed(2)}
                       {' '}
-                      ETH
+                      { mushroom ? 'GU' : 'ETH' }
                     </PriceIndicator>
                   </WalletInfoWrapper>
-                  <CircularImg src={image} />
+                  <CircularImg
+                    mushroom={mushroom}
+                    src={mushroom ? '/static/mushroom-gugu-coin.png' : image}
+                  />
                 </React.Fragment>
               )
             }}
@@ -244,10 +255,15 @@ class HeaderComponent extends React.PureComponent {
               const shortAddress = `${address.slice(0, showLength)}...${address.slice(address.length - showLength, address.length + 1)}`
               return (
                 <WalletInfoWrapper>
-                  <GrayText>
+                  <LabelText mushroom={mushroom}>
                     {shortAddress}
-                  </GrayText>
-                  <PriceIndicator amount={Number(balance).toFixed(6)} label="balance">
+                  </LabelText>
+                  <PriceIndicator
+                    mushroom={mushroom}
+                    amount={Number(balance).toFixed(6)}
+                    label="balance"
+                    labelUint="ETH"
+                  >
                     {Number(balance).toFixed(2)}
                     {' '}
                     ETH
@@ -256,7 +272,7 @@ class HeaderComponent extends React.PureComponent {
               )
             }}
           </Query>
-          <CircularImg src="/static/eth.svg" />
+          <CircularImg src="/static/eth.svg" mushroom={mushroom} />
         </RightArea>
       </Header>
     )
