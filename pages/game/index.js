@@ -1,9 +1,13 @@
 import React from 'react'
 import moment from 'moment'
 import styled, { keyframes } from 'styled-components'
+import { compose } from 'recompose'
 import PropTypes from 'prop-types'
-import { div, mul } from '../../utils/calculation'
-import withContracts from '../../lib/withContracts'
+import { Query } from 'react-apollo'
+import { GET_GAMES } from '../../lib/queries'
+import Header from '../../containers/Header'
+import { mul } from '../../utils/calculation'
+import withPolling from '../../lib/withPolling'
 import Section, { SectionLabel, SectionContent, SectionWrapper } from '../../components/Section'
 import Layout from '../../components/Layout'
 import Input from '../../components/Input'
@@ -109,99 +113,66 @@ const BuyButton = styled.div`
     `
   )}
 `
-class Game extends React.PureComponent {
+
+const CenterWrapper = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`
+
+const Img = styled.img`
+  width: 50%;
+`
+
+class GamePage extends React.PureComponent {
   static async getInitialProps({ req }) {
     return { params: req.params }
   }
 
   constructor(props) {
     super(props)
-    const { web3, contracts: { playerBook, numberGame } } = this.props
-    this.web3 = web3
-    this.playerBook = playerBook
-    this.numberGame = numberGame
     this.state = {
-      user: { address: '', balance: '0' },
-      snapshotWinner: { name: '', number: '', timestamp: '' },
-      banker: { address: '' },
-      game: {
-        lotteryAmount: '0',
-        winningAmount: '0',
-      },
       tempNumber: '',
       snapshotNumberMessage: '',
       numbers: [],
       keyPrice: '0',
-      snapshotKeyPrice: '0',
-      snapshotWinnerPrice: '0',
-      loadingUser: true,
-      loadingGame: true,
+      currentTime: moment(),
     }
   }
 
   componentDidMount() {
     const {
-      params: { id },
-      contractMethods: {
-        getKeyPrice,
-        getSnapshotKeyPrice,
-        getSnapshotWinnerFee,
+      apolloClient: {
+        watchQuery,
       },
+      params: { id },
     } = this.props
-    this.gamePolling = setInterval(() => this.fetchGameInfo(id), 2000)
-    this.polling = setInterval(this.updateUserInfo, 2000)
-    this.snapshotWinnerPolling = setInterval(this.updateSnapshotWinner, 2000)
-    Promise.all([
-      getKeyPrice(),
-      getSnapshotKeyPrice(),
-      getSnapshotWinnerFee(),
-    ])
-      .then(([keyPrice, snapshotKeyPrice, snapshotWinnerPrice]) => this.setState({
-        keyPrice,
-        snapshotKeyPrice,
-        snapshotWinnerPrice,
-      }))
+
+    this.timer = setInterval(() => {
+      this.setState({ currentTime: moment() })
+    }, 1000)
+
+    this.pollingGame = watchQuery({
+      query: GET_GAMES,
+      variables: { gameIds: [Number(id)] },
+      pollInterval: 2000,
+      ssr: false,
+    }).subscribe()
   }
 
   componentWillUnmount() {
-    if (this.polling) {
-      clearInterval(this.polling)
+    if (this.timer) {
+      clearInterval(this.timer)
     }
-    if (this.gamePolling) {
-      clearInterval(this.gamePolling)
+    if (this.pollingGame) {
+      this.pollingGame.unsubscribe()
     }
   }
-
-  updateSnapshotWinner = () => {
-    const { contractMethods, params: { id } } = this.props
-    contractMethods
-      .getSnapshotWinner({ round: id })
-      .then(({ name, number, timestamp }) => this.setState({
-        snapshotWinner: { name, number, timestamp },
-      }))
-  }
-
-  updateUserInfo = () => {
-    const { contractMethods: { getUserInformationWithAddress }, getCurrentMetaAccount } = this.props
-    getCurrentMetaAccount()
-      .then((address) => {
-        getUserInformationWithAddress(address)
-          .then((user) => {
-            this.setState({ user, loadingUser: false })
-          })
-      })
-  }
-
-  getWalletInfoWithAddress = address => this.web3.eth.getBalance(address)
-    .then(balance => ({
-      balance: div(balance, this.web3.utils.unitMap.ether),
-      address,
-    }))
 
   updateFiled = (key, value) => this.setState({ [key]: value })
 
   removeTarget = (key, index) => {
-    const targets = this.state[key] /* eslint-disable-line */
+    const targets = this.state[key] // eslint-disable-line
     this.setState({
       [key]: [
         ...targets.slice(0, index),
@@ -214,18 +185,14 @@ class Game extends React.PureComponent {
     const { contractMethods, params: { id } } = this.props
     contractMethods.buyKeys({ keys, address, round: id })
       .then(() => this.setState({ numbers: [], snapshotNumberMessage: '' }))
-      .catch((err) => {
-        console.log(err)
-      })
+      .catch(err => console.log(err))
   }
 
   snapshotKeys = (keys, address) => {
     const { contractMethods, params: { id } } = this.props
     contractMethods.snapshotKeys({ keys, address, round: id })
       .then(() => this.setState({ numbers: [], snapshotNumberMessage: '' }))
-      .catch((err) => {
-        console.log(err)
-      })
+      .catch(err => console.log(err))
   }
 
   snapshotWinner = (address, price) => {
@@ -258,210 +225,216 @@ Snapshot Time: ${moment.duration(timeDiff).humanize()} ago.
       })
   }
 
-  fetchGameInfo = (id) => {
-    const { contractMethods: { getCurrentLotteryPotAmount, getGameById } } = this.props
-    Promise.all([
-      getCurrentLotteryPotAmount(),
-      getGameById(id),
-    ])
-      .then(([lotteryAmount, game]) => this.setState({
-        banker: game.banker,
-        game: Object.assign(game, { lotteryAmount }),
-        loadingGame: false,
-      }))
-  }
-
   render() {
     const {
-      banker,
-      game,
-      tempNumber,
+      params: { id },
+      walletAddress,
+    } = this.props
+    const {
+      currentTime,
       numbers,
-      user,
-      keyPrice,
-      snapshotKeyPrice,
+      tempNumber,
       snapshotNumberMessage,
-      snapshotWinner,
-      snapshotWinnerPrice,
-      loadingGame,
-      loadingUser,
     } = this.state
-    const isValidNumberInput = !(tempNumber === '')
-    const countDownTimeDiff = moment(game.endTime).diff(moment())
-    const gameIsOver = countDownTimeDiff < 0
-    const canBuyState = numbers.length > 0
-
-    if (loadingGame || loadingUser) {
-      return (
-        <Layout>
-          <Loader />
-        </Layout>
-      )
-    }
 
     return (
       <Layout>
-        <SectionWrapper>
-          <Section sectionTitle="Game Time Info">
-            <SectionLabel>Start</SectionLabel>
-            <SectionContent>{moment(game.startTime).format('YYYY-MM-DD HH:mm:ss')}</SectionContent>
-            <SectionLabel>End</SectionLabel>
-            <SectionContent>{moment(game.endTime).format('YYYY-MM-DD HH:mm:ss')}</SectionContent>
-            <SectionLabel>Count Down</SectionLabel>
-            <SectionContent>
-              {
-                gameIsOver
-                  ? '00:00:00'
-                  : moment.utc(countDownTimeDiff).format('HH:mm:ss')
-              }
-            </SectionContent>
-          </Section>
-        </SectionWrapper>
-        <SectionWrapper>
-          <Section sectionTitle="Winning Pot">
-            <LineWrapper>
-              <EthImg src="/static/eth.svg" />
-              <Color>
-                {game.winningAmount}
-              </Color>
-            </LineWrapper>
-          </Section>
-          <Section sectionTitle="Lottery Pot">
-            <LineWrapper>
-              <EthImg src="/static/eth.svg" />
-              <Color>{game.lotteryAmount}</Color>
-            </LineWrapper>
-          </Section>
-        </SectionWrapper>
-        <SectionWrapper>
-          <Section sectionTitle="Buy Number">
-            <SectionLabel>
-              Price to buy one number $
-              {keyPrice}
-            </SectionLabel>
-            <SectionContent>
-              {mul(keyPrice, numbers.length, '1.1')}
-              {' '}
-              eth
-            </SectionContent>
-            <BuyButton
-              onClick={() => this.buyKeys(numbers, user.address)}
-              isDisabled={!canBuyState}
-            >
-              Buy Numbers
-            </BuyButton>
-            <SectionLabel>
-              Price to snapshot one number $
-              {snapshotKeyPrice}
-            </SectionLabel>
-            <SectionContent>
-              {mul(snapshotKeyPrice, numbers.length, '1.1')}
-              {' '}
-              eth
-            </SectionContent>
-            <BuyButton
-              onClick={() => this.snapshotKeys(numbers, user.address)}
-              isDisabled={!canBuyState}
-            >
-              Snapshot Numbers
-            </BuyButton>
-            <Input
-              label="Number"
-              type="number"
-              min="0"
-              onChange={(e) => {
-                const newValue = e.target.value
-                this.updateFiled('tempNumber', newValue)
-                this.getKeysSnapshotCount({ key: newValue })
-              }}
-              value={tempNumber}
-            />
-            <NoticeWording>
-              {snapshotNumberMessage}
-            </NoticeWording>
-            <StyledButton
-              isDisabled={!isValidNumberInput}
-              onClick={() => {
-                if (!isValidNumberInput) return
-                this.setState({
-                  tempNumber: '',
-                  numbers: [tempNumber, ...numbers],
-                  snapshotNumberMessage: '',
-                })
-              }}
-            >
-              +
-            </StyledButton>
-            {
-              numbers.length === 0
-                ? <NumbersContainerWrapper />
-                : (
-                  <NumbersContainer>
-                    {numbers.map((value, index) => (
-                      <NumberLine
-                        onClick={() => this.removeTarget('numbers', index)}
-                        key={value}
-                      >
-                        {value}
-                      </NumberLine>
-                    ))}
-                  </NumbersContainer>
-                )
+        <Header />
+        <Query
+          query={GET_GAMES}
+          variables={{ gameIds: [Number(id)] }}
+          skip={!id}
+        >
+          {({ data, loading }) => {
+            if (loading || !data) {
+              return (<Loader />)
             }
-          </Section>
-          <Section sectionTitle="Snapshot Winner">
-            <SectionLabel>Snapshot Winner Name</SectionLabel>
-            <SectionContent>{snapshotWinner.name}</SectionContent>
-            <SectionLabel>Snapshot Time</SectionLabel>
-            <SectionContent>
-              {snapshotWinner.timestamp && moment
-                .duration(moment(snapshotWinner.timestamp).diff(moment()))
-                .humanize()
-              }
-            </SectionContent>
-            <SectionLabel>Winning Number</SectionLabel>
-            <SectionContent>{snapshotWinner.number}</SectionContent>
-            <SectionLabel>Snapshot Fee</SectionLabel>
-            <SectionContent>
-              {snapshotWinnerPrice}
-              {' '}
-              eth
-            </SectionContent>
-            <StyledButton onClick={() => this.snapshotWinner(user.address, snapshotWinnerPrice)}>
-              Snapshot Winner
-            </StyledButton>
-          </Section>
-        </SectionWrapper>
+            const { gameInformation: { games: [game], potAmountLottery } } = data
+            const isValidNumberInput = !(tempNumber === '')
+            const countDownTimeDiff = moment(game.endTime).diff(currentTime)
+            const gameIsOver = countDownTimeDiff < 0
+            const canBuyState = numbers.length > 0
 
-        <SectionWrapper>
-          <Section sectionTitle="Banker Info">
-            <SectionLabel>Address</SectionLabel>
-            <SectionContent>{banker.address}</SectionContent>
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{banker.name}</SectionContent>
-          </Section>
-          <Section sectionTitle="User Info">
-            <SectionLabel>Address</SectionLabel>
-            <SectionContent>{user.address}</SectionContent>
-            <SectionLabel>Name</SectionLabel>
-            <SectionContent>{user.name}</SectionContent>
-            <SectionLabel>Balance</SectionLabel>
-            <SectionContent>{user.balance}</SectionContent>
-            <SectionLabel>Claimable</SectionLabel>
-            <SectionContent>{user.claimable}</SectionContent>
-          </Section>
-        </SectionWrapper>
+            return (
+              <React.Fragment>
+                <SectionWrapper>
+                  <Section sectionTitle="Winning Pot">
+                    <LineWrapper>
+                      <EthImg src="/static/eth.svg" />
+                      <Color>
+                        {game.potAmountWinning}
+                      </Color>
+                    </LineWrapper>
+                  </Section>
+                  <Section sectionTitle="Game Info">
+                    <SectionLabel>Start</SectionLabel>
+                    <SectionContent>{moment(game.startTime).format('YYYY-MM-DD HH:mm:ss')}</SectionContent>
+                    <SectionLabel>End</SectionLabel>
+                    <SectionContent>{moment(game.endTime).format('YYYY-MM-DD HH:mm:ss')}</SectionContent>
+                    <SectionLabel>Count Down</SectionLabel>
+                    <SectionContent>
+                      {
+                        gameIsOver
+                          ? '00:00:00'
+                          : moment.utc(countDownTimeDiff).format('HH:mm:ss')
+                      }
+                    </SectionContent>
+                    <SectionContent>
+                      <CenterWrapper>
+                        {game.winner.wallet && 'Current Winner Info'}
+                      </CenterWrapper>
+                    </SectionContent>
+                    { !game.winner.wallet && (
+                      <SectionContent>
+                        <CenterWrapper>
+                          Waiting For a Winner
+                        </CenterWrapper>
+                      </SectionContent>
+                    ) }
+                    { game.winner.wallet && (
+                      <CenterWrapper>
+                        <Img src={game.winner.wallet.user.image} />
+                      </CenterWrapper>
+                    ) }
+                    <SectionContent>
+                      <CenterWrapper>
+                        Updated at
+                        {' '}
+                        {moment.duration(moment(game.winner.timestamp).diff(moment())).humanize()}
+                        {' '}
+                        age
+                      </CenterWrapper>
+                    </SectionContent>
+                  </Section>
+                  <Section sectionTitle="Lottery Pot">
+                    <LineWrapper>
+                      <EthImg src="/static/eth.svg" />
+                      <Color>{potAmountLottery}</Color>
+                    </LineWrapper>
+                  </Section>
+                </SectionWrapper>
+                <SectionWrapper>
+                  <Section sectionTitle="Buy Number">
+                    <SectionLabel>
+                      Price to buy one number $
+                      {game.feeKeyPurchasing}
+                    </SectionLabel>
+                    <SectionContent>
+                      {mul(game.feeKeyPurchasing, numbers.length, '1.1')}
+                      {' '}
+                      eth
+                    </SectionContent>
+                    <BuyButton
+                      onClick={() => this.buyKeys(numbers, walletAddress)}
+                      isDisabled={!canBuyState}
+                    >
+                      Buy Numbers
+                    </BuyButton>
+                    <SectionLabel>
+                      Price to snapshot one number $
+                      {game.feeKeyRevealing}
+                    </SectionLabel>
+                    <SectionContent>
+                      {mul(game.feeKeyRevealing, numbers.length, '1.1')}
+                      {' '}
+                      eth
+                    </SectionContent>
+                    <BuyButton
+                      onClick={() => this.snapshotKeys(numbers, walletAddress)}
+                      isDisabled={!canBuyState}
+                    >
+                      Snapshot Numbers
+                    </BuyButton>
+                    <Input
+                      label="Number"
+                      type="number"
+                      min="0"
+                      onChange={(e) => {
+                        const newValue = e.target.value
+                        this.updateFiled('tempNumber', newValue)
+                        this.getKeysSnapshotCount({ key: newValue })
+                      }}
+                      value={tempNumber}
+                    />
+                    <NoticeWording>
+                      {snapshotNumberMessage}
+                    </NoticeWording>
+                    <StyledButton
+                      isDisabled={!isValidNumberInput}
+                      onClick={() => {
+                        if (!isValidNumberInput) return
+                        this.setState({
+                          tempNumber: '',
+                          numbers: [tempNumber, ...numbers],
+                          snapshotNumberMessage: '',
+                        })
+                      }}
+                    >
+                      +
+                    </StyledButton>
+                    {
+                      numbers.length === 0
+                        ? <NumbersContainerWrapper />
+                        : (
+                          <NumbersContainer>
+                            {numbers.map((value, index) => (
+                              <NumberLine
+                                onClick={() => this.removeTarget('numbers', index)}
+                                key={value}
+                              >
+                                {value}
+                              </NumberLine>
+                            ))}
+                          </NumbersContainer>
+                        )
+                    }
+                  </Section>
+                  <Section sectionTitle="Snapshot Winner">
+                    <SectionLabel>Snapshot Winner Name</SectionLabel>
+                    <SectionContent>
+                      {game.winner.wallet
+                        ? game.winner.wallet.user.name
+                        : ''
+                      }
+                    </SectionContent>
+                    <SectionLabel>Snapshot Time</SectionLabel>
+                    <SectionContent>
+                      {moment.duration(moment(game.winner.timestamp).diff(moment())).humanize()}
+                      {' ago'}
+                    </SectionContent>
+                    <SectionLabel>Winning Number</SectionLabel>
+                    <SectionContent>{game.winner.winningNumber}</SectionContent>
+                    <SectionLabel>Snapshot Fee</SectionLabel>
+                    <SectionContent>
+                      {game.feeSnapshotWinner}
+                      {' '}
+                      eth
+                    </SectionContent>
+                    <StyledButton
+                      onClick={() => this.snapshotWinner(walletAddress, game.feeSnapshotWinner)}
+                    >
+                      Snapshot Winner
+                    </StyledButton>
+                  </Section>
+                </SectionWrapper>
+              </React.Fragment>
+            )
+          }}
+        </Query>
       </Layout>
     )
   }
 }
 
-Game.propTypes = {
-  contracts: PropTypes.object, /* eslint-disable-line */
-  web3: PropTypes.object, /* eslint-disable-line */
-  params: PropTypes.object, /* eslint-disable-line */
+GamePage.propTypes = {
+  // contracts: PropTypes.object, /* eslint-disable-line */
+  apolloClient: PropTypes.object, /* eslint-disable-line */
   contractMethods: PropTypes.object, /* eslint-disable-line */
-  getCurrentMetaAccount: PropTypes.func.isRequired,
+  params: PropTypes.object, /* eslint-disable-line */
+  walletAddress: PropTypes.string.isRequired,
 }
 
-export default withContracts(Game)
+
+export default compose(
+  withPolling,
+)(GamePage)

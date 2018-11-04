@@ -28,7 +28,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0x0e28f992c222476AeD67500948A2634f1D8681B5;
+    address constant playbookContractAddress_ = 0xCdA455D705aB62C16B1C465B8B58B3fd20762E93;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
     
@@ -84,11 +84,12 @@ contract NumberGame is GameEvents {
         uint256 winnerNumber;
         uint winnerTimestamp;
         bytes32[] participantes;
+        address[] participantesAddress;
         mapping(uint256 => uint256) keys;
         mapping(uint256 => SnapshotKey) snapshotKeys;
         mapping(bytes32 => uint256[]) userKeys;
     }
-    
+
     // Internal Function
 
     function returnTrueIfIsInterger(uint256 num)
@@ -163,11 +164,13 @@ contract NumberGame is GameEvents {
         view
         returns (
             bytes32,
-            uint256
+            uint256,
+            address
         )
     {   
         bytes32 tempWinner;
         uint256 tempWinningNumber;
+        address tempWinnerAddress;
         Game storage currentGame = games_[_gameRound];
         bytes32[] memory participantes = currentGame.participantes;
         for (uint i = 0; i < participantes.length; i++) {
@@ -181,12 +184,14 @@ contract NumberGame is GameEvents {
                 ) {
                     tempWinningNumber = targetKey;
                     tempWinner = participantes[i];
+                    tempWinnerAddress = currentGame.participantesAddress[i];
                 }
             }
         }
         return (
             tempWinner,
-            tempWinningNumber
+            tempWinningNumber,
+            tempWinnerAddress
         );
     }
     
@@ -230,14 +235,16 @@ contract NumberGame is GameEvents {
         returns (
             uint,
             bytes32,
-            uint256
+            uint256,
+            address
         )
     {
         Game storage currentGame = games_[_gameRound];
         return (
             currentGame.winnerTimestamp,
             currentGame.winnerName,
-            currentGame.winnerNumber    
+            currentGame.winnerNumber,
+            currentGame.winnerAddress
         );
     }   
     
@@ -329,6 +336,7 @@ contract NumberGame is GameEvents {
         
         if(currentGame.userKeys[userName].length == 0) {
             currentGame.participantes.push(userName);
+            currentGame.participantesAddress.push(playerAddress);
         }
         
         for (uint i = 0; i < _keys.length; i++) {
@@ -351,8 +359,9 @@ contract NumberGame is GameEvents {
             depositAmount,
             currentGame.bankerAddress
         );
-        (bytes32 winnerName, uint256 winningNumber) = currentWinner(_gameRound);
+        (bytes32 winnerName, uint256 winningNumber, address winnerAddress) = currentWinner(_gameRound);
         currentGame.winnerName = winnerName;
+        currentGame.winnerAddress = winnerAddress;
         currentGame.winnerNumber = winningNumber;
         currentGame.winnerTimestamp = block.timestamp;
     }

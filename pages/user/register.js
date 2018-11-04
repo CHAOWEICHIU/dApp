@@ -48,7 +48,6 @@ const Warning = styled.div`
 const UserImg = styled.img`
   width: 80%;
 `
-
 class RegisterUserPage extends React.PureComponent {
   constructor(props) {
     super(props)
@@ -99,7 +98,6 @@ class RegisterUserPage extends React.PureComponent {
               )
             }
             const { wallet: { user } } = data
-            const { affiliate } = user
             const registered = user
             return (
               <React.Fragment>
@@ -170,6 +168,8 @@ class RegisterUserPage extends React.PureComponent {
                             {(queryResponseSecond) => {
                               const canSubmit = queryResponseFirst.data
                               && queryResponseSecond.data
+                              && queryResponseFirst.data.playerBook
+                              && queryResponseSecond.data.playerBook
                               && (
                                 !queryResponseFirst.data.playerBook.player
                                 && queryResponseSecond.data.playerBook.player
@@ -207,20 +207,20 @@ class RegisterUserPage extends React.PureComponent {
                   </Section>
                 </SectionWrapper>
                 ) }
-                { registered && affiliate.user && (
+                { registered && user.affiliate.user && (
                 <SectionWrapper>
                   <Section sectionTitle="Laff Info">
                     <SectionImgWrapper>
-                      <UserImg src={affiliate.user.image} />
+                      <UserImg src={user.affiliate.user.image} />
                     </SectionImgWrapper>
                     <SectionLabel>Address</SectionLabel>
-                    <SectionContent>{affiliate.address}</SectionContent>
+                    <SectionContent>{user.affiliate.address}</SectionContent>
                     <SectionLabel>Balance</SectionLabel>
-                    <SectionContent>{affiliate.balance}</SectionContent>
+                    <SectionContent>{user.affiliate.balance}</SectionContent>
                     <SectionLabel>Name</SectionLabel>
-                    <SectionContent>{affiliate.user.name}</SectionContent>
+                    <SectionContent>{user.affiliate.user.name}</SectionContent>
                     <SectionLabel>Claimable</SectionLabel>
-                    <SectionContent>{affiliate.user.claimable}</SectionContent>
+                    <SectionContent>{user.affiliate.user.claimable}</SectionContent>
                   </Section>
                 </SectionWrapper>
                 ) }
