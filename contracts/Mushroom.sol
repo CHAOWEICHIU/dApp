@@ -41,7 +41,7 @@ contract Mushroom {
         });
     }
     
-    function getGuCoin(address _user) internal view returns (uint256) {
+    function getGuCoin(address _user) public view returns (uint256) {
         User storage user = users[_user];
         if(user.registerBlockheight>0) {
             uint256 base = (block.number - user.registerBlockheight);
@@ -101,11 +101,8 @@ contract Mushroom {
         return mushroomGames.getGameInfo(game_index);
     }
     
-    function getPlayerGame(address _addr) view public returns (uint256) {
-        if(msg.sender == _addr) {
-            return 2;
-        }
-        return 1;
+    function getPlayerGame(address _addr) view public returns (bool, uint256) {
+        return mushroomGames.getPlayerGame(_addr);
     }
     
 }
@@ -175,6 +172,27 @@ library MushroomGameSystem {
         return (addresses, levels);
     }
     
+    function getPlayerGame(Data storage self, address _addr) 
+        internal 
+        view 
+        returns(bool, uint256) 
+    {
+        for(uint256 i = 0; i < self.index; i++) {
+            MushroomGame storage _m = self.mushroomGames[i];
+            string memory status = gameStatus(self, i);
+            
+            if(keccak256(abi.encodePacked(status)) == keccak256(abi.encodePacked("aborted")) || keccak256(abi.encodePacked(status)) == keccak256(abi.encodePacked("ended"))) {
+                continue;
+            }
+            for(uint8 j = 0; j< _m.gamer_count; j++) {
+                if(_m.gamer[j] == _addr) {
+                    return (true, i);
+                }
+            }
+        }
+        return (false, 0);
+    }
+    
     function getGameInfo(
         Data storage self,
         uint256 game_index
@@ -193,19 +211,7 @@ library MushroomGameSystem {
         MushroomGame storage _m = self.mushroomGames[game_index];
         address[] memory addr = new address[](_m.gamer_count);
         string memory status;
-        if(_m.game_start_at == 0) {
-            if(block.number - _m.created_at_block >= _m.pending_block) {
-                status = "aborted";
-            } else {
-                status = "pending";
-            }
-        } else {
-            if(block.number - _m.game_start_at >= _m.gaming_block) {
-                status = "ended";
-            } else {
-                status = "started";
-            }
-        } 
+        status = gameStatus(self, game_index);
         for(uint8 i=0; i<_m.gamer_count; i++) {
             addr[i] = _m.gamer[i];
         } 
@@ -337,6 +343,24 @@ library MushroomGameSystem {
         
     }
     
+    function gameStatus(Data storage self, uint256 index) view internal returns (string) {
+        MushroomGame memory _m = self.mushroomGames[index];
+        string memory status;
+        if(_m.game_start_at == 0) {
+            if(block.number - _m.created_at_block >= _m.pending_block) {
+                status = "aborted";
+            } else {
+                status = "pending";
+            }
+        } else {
+            if(block.number - _m.game_start_at >= _m.gaming_block) {
+                status = "ended";
+            } else {
+                status = "started";
+            }
+        }
+        return status;
+    }
     function isEnd(Data storage self, uint256 index) 
         internal
         view
@@ -390,7 +414,6 @@ library MushroomGameSystem {
         }
         return;
     }
-    
 }
 
 library LedgerSystem {
