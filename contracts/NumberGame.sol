@@ -1,4 +1,4 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.23;
 
 import "./SafeMath.sol";
 
@@ -28,7 +28,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0xCdA455D705aB62C16B1C465B8B58B3fd20762E93;
+    address constant playbookContractAddress_ = 0xebd389b4267E23102F885b96f012c0eD38749E6A;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
     
