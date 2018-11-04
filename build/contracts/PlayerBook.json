@@ -7925,10 +7925,10 @@
     "5777": {
       "events": {},
       "links": {},
-      "address": "0x28299963d19286c00f5366bef900d27f8eb02cb8",
-      "transactionHash": "0xed307904c95a4ebe3d8a18c2ff314ca50bc18db2f96f6292941e89ba14f88b11"
+      "address": "0x60496d9b852901c13babd023043a9c1b2143ae92",
+      "transactionHash": "0x769e253bde4ce3ae358b3b48a36381686d75736bee242ed74004611b5fd73edd"
     }
   },
   "schemaVersion": "2.0.1",
-  "updatedAt": "2018-11-04T01:23:32.358Z"
+  "updatedAt": "2018-11-04T03:42:07.136Z"
 }
