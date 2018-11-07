@@ -100,7 +100,7 @@ const CircularImg = styled.img`
   height: 30px;
   width: 30px;
   border-radius: 100%;
-  padding: ${props => (props.mushroom ? '5px': '10px')};
+  padding: ${props => (props.mushroom ? '5px' : '10px')};
   background: ${props => (props.mushroom ? 'transparent' : '#0B1C29')};
   border: 1px white solid;
   margin-right: 15px;
@@ -147,7 +147,7 @@ const MushroomImg = styled.img`
 `
 const MushroomSubImg = styled.img`
   height: 90%;
-  transform: scale(2.4) translate(4px, 6px);
+  transform: scale(2) translate(6px, 6px);
 `
 
 class HeaderComponent extends React.PureComponent {

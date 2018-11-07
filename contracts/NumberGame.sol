@@ -28,7 +28,7 @@ contract GameEvents {
 
 contract NumberGame is GameEvents {
     using SafeMath for uint256;
-    address constant playbookContractAddress_ = 0xebd389b4267E23102F885b96f012c0eD38749E6A;
+    address constant playbookContractAddress_ = 0x3bF4Ad2241B63EA2D18237FF27868770608AeA4E;
 
     PlayerBookInterface constant private PlayerBook = PlayerBookInterface(playbookContractAddress_);
     

@@ -18,22 +18,23 @@ const resizeAnimation = keyframes`
 const Dot = styled.div`
   width:${props => props.size}px;
   height:${props => props.size}px;
-  background-color:white;
+  background-color: ${props => (props.mushroom ? 'black' : 'white')};
   border-radius:100%;
   margin:3px;
   animation: ${() => resizeAnimation} 1s infinite ease-in-out both;
   animation-delay:${props => `${props.delay}s`};
 `
 
-const Loader = ({ size = 4, dotsCount = 3 }) => (
+const Loader = ({ size = 4, dotsCount = 3, mushroom = false }) => (
   <CenterComponent>
-    {range(1, dotsCount + 1).map((d, di) => <Dot size={size * 4} delay={di} key={`${d}_dot`} />)}
+    {range(1, dotsCount + 1).map((d, di) => <Dot mushroom={mushroom} size={size * 4} delay={di} key={`${d}_dot`} />)}
   </CenterComponent>
 )
 
 Loader.propTypes = {
   size: PropTypes.number, /* eslint-disable-line */
   dotsCount: PropTypes.number, /* eslint-disable-line */
+  mushroom: PropTypes.bool,
 }
 
 export default Loader

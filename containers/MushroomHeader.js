@@ -38,12 +38,7 @@ const StyledH3 = styled(H2)`
 `
 
 const pages = [
-  { link: '/mushroom', name: 'Home' },
-  { link: '/mushroom/us', name: 'Us' },
-  { link: '/mushroom/mall', name: 'ShroomMall' },
-  { link: '/mushroom/coin', name: 'ShroomCoin' },
-  { link: '/mushroom/faq', name: 'FAQ' },
-  { link: '/mushroom/user', name: 'Profile' },
+  { link: '/mushroom', name: '' },
 ]
 
 const MushroomHeader = ({ pathname }) => (

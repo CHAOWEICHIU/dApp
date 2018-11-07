@@ -43,7 +43,7 @@ contract Mushroom {
     
     function getGuCoin(address _user) public view returns (uint256) {
         User storage user = users[_user];
-        if(user.registerBlockheight>0) {
+        if(isRegister(_user)) {
             uint256 base = (block.number - user.registerBlockheight);
             return user.ledger.getBalance(base);
         }
@@ -56,7 +56,7 @@ contract Mushroom {
     }
     
     function newGame() public payable returns(uint256) {
-        return mushroomGames.newGame(msg.sender, msg.value, 5, 5);
+        return mushroomGames.newGame(msg.sender, msg.value, 5000, 5000);
     }
     
     function joinGame(uint256 game_id) public returns (bool) {
@@ -84,6 +84,12 @@ contract Mushroom {
     
     function getBankerGame(address _addr) view public returns (bool, uint256) {
         return mushroomGames.getBankerGame(_addr);
+    }
+    
+    function buyItem(address _addr, uint256 game_index, uint8 item_ind) payable public {
+        uint256 base = getGuCoin(_addr);
+        mushroomGames.buyItem(_addr, game_index, item_ind, base);
+        
     }
     
     function getGameInfo(uint256 game_index) 
@@ -135,18 +141,49 @@ library MushroomGameSystem {
         bool unique;    //buy once only
         string name;
         uint32 duration;
-        uint32 price;
+        uint256 price;
         uint8 mushroom_rate;
         uint8 production_rate;
     }
     
     struct GuGuLedger {
-        Item item;
+        uint8 item_index;
         address user;
         bool isLevel;
         uint256 block;
         uint8 team_index;
         uint8 user_level;
+    }
+    
+    function buyItem(
+        Data storage self,
+        address _addr,
+        uint256 game_index,
+        uint8 item_ind,
+        uint256 base
+    ) 
+        internal 
+        returns (uint256)
+    {
+        if(base == 1) {
+            
+        }
+        MushroomGame storage m = self.mushroomGames[game_index];
+        bool il = false;
+        if(m.items[item_ind].mushroom_rate != 0) {
+            il = true;
+        }
+        
+        m.ledgers[m.ledger_count] = GuGuLedger({
+            item_index: item_ind,
+            user: _addr,
+            isLevel: il,
+            block: block.number,
+            team_index: m.team_member[_addr],
+            user_level: m.levels[_addr]
+        });
+        m.ledger_count += 1;
+        return (m.levels[_addr] * m.items[item_ind].price);
     }
     
     function getTeamMember(
@@ -159,7 +196,8 @@ library MushroomGameSystem {
         returns (address[], uint8[]) 
     {
         MushroomGame storage _m = self.mushroomGames[game_index];
-        address[] memory addresses = new address[](_m.gamer_count / _m.team_count);
+        address[] memory addresses = new address[](
+            _m.gamer_count / _m.team_count);
         uint8[] memory levels = new uint8[](_m.gamer_count / _m.team_count);
         uint8 idx = 0;
         for(uint8 i=0; i< _m.gamer_count; i++) {
@@ -179,9 +217,10 @@ library MushroomGameSystem {
     {
         for(uint256 i = 0; i < self.index; i++) {
             MushroomGame storage _m = self.mushroomGames[i];
-            string memory status = gameStatus(self, i);
-            
-            if(keccak256(abi.encodePacked(status)) == keccak256(abi.encodePacked("aborted")) || keccak256(abi.encodePacked(status)) == keccak256(abi.encodePacked("ended"))) {
+            bytes32 status = keccak256(abi.encodePacked(gameStatus(self, i)));
+            bytes32 aborted = keccak256(abi.encodePacked("aborted"));
+            bytes32 ended = keccak256(abi.encodePacked("ended"));
+            if(status == aborted || status == ended) {
                 continue;
             }
             for(uint8 j = 0; j< _m.gamer_count; j++) {
@@ -250,7 +289,6 @@ library MushroomGameSystem {
         returns (uint256) 
     {
         MushroomGame storage _m = self.mushroomGames[game_index];
-        //uint248 team_members = _m.gamer_count / _m.team_count;
         uint256 total_gugu = 0;
         uint256 end_block = 0;
         if(_m.game_start_at + _m.gaming_block <= target_block) {
@@ -270,16 +308,17 @@ library MushroomGameSystem {
             if(_l.isLevel) {
                 total_gugu += (end_block - _l.block) * 3;
             } else {
-                if(!_l.item.unique) {
-                    if((_l.block + _l.item.duration) > end_block) {
+                if(!_m.items[_l.item_index].unique) {
+                    Item storage _i = _m.items[_l.item_index];
+                    if((_l.block + _i.duration) > end_block) {
                         total_gugu += (end_block 
-                            - (_l.block + _l.item.duration)) 
+                            - _l.block) 
                             * _l.user_level 
-                            * _l.item.production_rate;
+                            * _i.production_rate;
                     } else {
-                        total_gugu += _l.item.duration 
+                        total_gugu += _i.duration 
                             * _l.user_level 
-                            * _l.item.production_rate;
+                            * _i.production_rate;
                     }
                 } else {
                     total_gugu += calcMushroom(
@@ -315,6 +354,11 @@ library MushroomGameSystem {
             team_count: 2
         });
         self.index += 1;
+        
+        newGameItem(self, self.index-1, "auntie", 1 finney, 5, 3, 0, false);
+        newGameItem(self, self.index-1, "grannie", 1 finney, 5, 2, 0, false);
+        newGameItem(self, self.index-1, "cough", _deposit*2 , 1, 0, 2, true);
+
         return self.index - 1 ;
     }
     
@@ -322,7 +366,7 @@ library MushroomGameSystem {
         Data storage self,
         uint256 game_index,
         string _name,
-        uint32 _price,
+        uint256 _price,
         uint32 _duration,
         uint8 _production_rate,
         uint8 _mushroom_rate,
