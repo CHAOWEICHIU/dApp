@@ -46,11 +46,10 @@ contract PlayerBookV2 {
         meetDepositRequirement(registrationFee_)
         payable
     {
-        // make sure the name has not been used
-        require(uIdName_[name] == 0, "sorry that names already taken");
-
-        // set up config
         address wallet = msg.sender;
+        require(uIdName_[name] == 0, "names already taken");
+        require(uIdWallet_[wallet] == 0, "address has been used");
+        
         totalUserCount ++;
         
         user_[totalUserCount].wallet = wallet;

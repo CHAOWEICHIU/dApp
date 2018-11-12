@@ -32,7 +32,7 @@ contract('PlayerBookV2', async (accounts) => {
         registerAffiliateId
       )
       .send({
-        from: firstAccount,
+        from: secondAccount,
         value: fee,
         gas: 3500000,
       })
@@ -42,7 +42,7 @@ contract('PlayerBookV2', async (accounts) => {
       const user = await user_(userCount).call()
       
       assert.isTrue(
-        toChecksumAddress(user.wallet) === toChecksumAddress(firstAccount),
+        toChecksumAddress(user.wallet) === toChecksumAddress(secondAccount),
         'registered wallet is not the one who registered',
       )
       assert.isTrue(
@@ -69,7 +69,23 @@ contract('PlayerBookV2', async (accounts) => {
           1
         )
         .send({
-          from: firstAccount,
+          from: secondAccount,
+          value: fee,
+          gas: 3500000,
+        })
+      } catch(error) {
+        return
+      }
+      assert.fail('Expected throw not received')
+    })
+    it('will throw error if a user use the same address', async () => {
+      try {
+        await registerUser(
+          utils.toHex('Q_Q'),
+          1
+        )
+        .send({
+          from: secondAccount,
           value: fee,
           gas: 3500000,
         })
