@@ -7,7 +7,9 @@ const PlayerBookV2 = artifacts.require('./PlayerBookV2.sol')
 const {
   div,
   mul,
+  add,
   sub,
+  lt,
 } = require('../utils/calculation')
 
 const { utils } = Web3
@@ -28,6 +30,8 @@ contract('PlayerBookV2', async (accounts) => {
     playerBookV2.address,
   )
 
+  const { eth: { getBalance } } = web3
+
   const {
     totalUserCount,
     registerUser,
@@ -35,6 +39,7 @@ contract('PlayerBookV2', async (accounts) => {
     user_,
     uIdWallet_,
     deposit,
+    claimMoney,
   } = playerBook.methods
 
   it('can register user, and will match user init state', async () => {
@@ -204,6 +209,33 @@ contract('PlayerBookV2', async (accounts) => {
     assert.isTrue(
       mul(div(depositAmount, '100'), '5') === affiliateAffiliateUser.claimable,
       'affiliate should have 5%',
+    )
+  })
+  it('can claim money', async () => {
+    const id = await uIdWallet_(account4).call()
+    const snapshotUser4Balance = await getBalance(account4)
+    const snapshotUser4 = await user_(id).call()
+    await claimMoney().send({
+      from: account4,
+      gas: 3500000,
+    })
+    const user4 = await user_(id).call()
+    const user4Balance = await getBalance(account4)
+    const amount = sub(
+      user4Balance,
+      add(snapshotUser4Balance, '3500000', user4.claimable),
+    )
+    assert.isTrue(
+      lt(amount, snapshotUser4.claimable),
+      'claim more than it owns',
+    )
+    assert.isTrue(
+      snapshotUser4Balance < user4Balance,
+      'amount did not increase after claim',
+    )
+    assert.isTrue(
+      user4.claimable === '0',
+      'should reset to 0',
     )
   })
 })

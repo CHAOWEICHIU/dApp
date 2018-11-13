@@ -98,8 +98,15 @@ contract PlayerBookV2 {
             );
     }
 
-
-
+    function claimMoney()
+        public
+    {
+        address claimerAddress = msg.sender;
+        User storage user = user_[uIdWallet_[claimerAddress]];
+        require(user.claimable != 0, "you don't have money to claim");
+        claimerAddress.transfer(user.claimable);
+        user.claimable = 0;
+    }
 }
 
 /*
