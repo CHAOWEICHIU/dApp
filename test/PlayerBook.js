@@ -20,7 +20,6 @@ contract('PlayerBookV2', async (accounts) => {
     account2,
     account3,
     account4,
-    account5,
   ] = accounts
   const playerBookV2 = await PlayerBookV2.deployed()
 
@@ -236,6 +235,23 @@ contract('PlayerBookV2', async (accounts) => {
     assert.isTrue(
       user4.claimable === '0',
       'should reset to 0',
+    )
+  })
+  it('cannot claim money', async () => {
+    const snapshotUser4Balance = await getBalance(account4)
+    try {
+      await claimMoney().send({
+        from: account4,
+        gas: 3500000,
+      })
+    } catch (error) {
+      return
+    }
+    assert.fail('Expected throw not received')
+    const user4Balance = await getBalance(account4)
+    assert.isTrue(
+      lt(user4Balance, snapshotUser4Balance),
+      'should not able to claim money',
     )
   })
 })
