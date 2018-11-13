@@ -3,6 +3,7 @@ pragma solidity ^0.4.19;
 import "./SafeMath.sol";
 
 contract PlayerBookV2 {
+    using SafeMath for uint256;
 
     modifier meetDepositRequirement(uint256 fee)
     {
@@ -29,6 +30,7 @@ contract PlayerBookV2 {
     {
         user_[1].wallet = msg.sender;
         user_[1].name = "wayne";
+        user_[1].affiliateId = 1;
         uIdWallet_[msg.sender] = 1;
         uIdName_["wayne"] = 1;
     }
@@ -49,7 +51,8 @@ contract PlayerBookV2 {
         address wallet = msg.sender;
         require(uIdName_[name] == 0, "names already taken");
         require(uIdWallet_[wallet] == 0, "address has been used");
-        
+        require(user_[affiliateId].affiliateId != 0, "this id does not exist");
+
         totalUserCount ++;
         
         user_[totalUserCount].wallet = wallet;
@@ -62,7 +65,38 @@ contract PlayerBookV2 {
 
     }
 
-    // function deposit
+    function deposit(address wallet)
+        public
+        payable
+    {
+        address defaultAddress;
+        uint256 depositAmount = msg.value;
+        if(wallet == defaultAddress) {
+            user_[1].claimable = user_[1].claimable.add(depositAmount);
+        }
+
+        uint256 affiliationPortionAmount = depositAmount.div(100);
+        uint256 playerId = uIdWallet_[wallet];
+        uint256 affiliatePlayerId = user_[playerId].affiliateId;
+        uint256 affiliateAffiliatePlayerId = user_[uIdWallet_[wallet]].affiliateId;
+        
+        /*
+          10% -> direct affiliate
+          5% -> affiliate's affiliate
+        */
+        uint256 affiliationPortionAmountInTen = affiliationPortionAmount.mul(10);
+        uint256 affiliationPortionAmountInFive = affiliationPortionAmount.mul(5);
+
+        user_[affiliatePlayerId].claimable = user_[affiliatePlayerId].claimable.add(affiliationPortionAmountInTen);
+        user_[affiliateAffiliatePlayerId].claimable = user_[affiliateAffiliatePlayerId].claimable.add(affiliationPortionAmountInFive);
+        user_[playerId].claimable = user_[playerId]
+          .claimable
+          .add(
+            depositAmount
+              .sub(affiliationPortionAmountInTen)
+              .sub(affiliationPortionAmountInFive)
+            );
+    }
 
 
 
