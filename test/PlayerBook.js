@@ -18,6 +18,7 @@ contract('PlayerBookV2', async (accounts) => {
     account2,
     account3,
     account4,
+    account5,
   ] = accounts
   const playerBookV2 = await PlayerBookV2.deployed()
 
@@ -81,7 +82,7 @@ contract('PlayerBookV2', async (accounts) => {
         1,
       )
         .send({
-          from: account2,
+          from: account3,
           value: registrationFee,
           gas: 3500000,
         })
@@ -96,7 +97,7 @@ contract('PlayerBookV2', async (accounts) => {
     const registrationFee = await registrationFee_().call()
     try {
       await registerUser(
-        utils.toHex('Q_Q'),
+        utils.toHex('Q___Q'),
         1,
       )
         .send({
@@ -160,7 +161,7 @@ contract('PlayerBookV2', async (accounts) => {
     )
   })
 
-  it('85% will goes to second user, and 15% will goes to affiliate', async () => {
+  it('85% will goes to second user, and total of 15% will goes to affiliate', async () => {
     const depositAmount = utils.toWei('1', 'ether')
     const registrationFee = await registrationFee_().call()
     const snapshotUserCount = await totalUserCount().call()
@@ -188,16 +189,21 @@ contract('PlayerBookV2', async (accounts) => {
       `user count should be ${Number(snapshotUserCount) + 1}`,
     )
 
-    const user4 = await user_(Number(snapshotUserCount) + 1).call()
-    const affiliateUser = await user_(user4.affiliateId).call()
+    const user4 = await user_(userCount).call()
 
+    const affiliateUser = await user_(user4.affiliateId).call()
+    const affiliateAffiliateUser = await user_(affiliateUser.affiliateId).call()
     assert.isTrue(
       mul(div(depositAmount, '100'), '85') === user4.claimable,
       'user should have 85%',
     )
     assert.isTrue(
-      mul(div(depositAmount, '100'), '15') === affiliateUser.claimable,
+      mul(div(depositAmount, '100'), '10') === affiliateUser.claimable,
       'affiliate should have 10%',
+    )
+    assert.isTrue(
+      mul(div(depositAmount, '100'), '5') === affiliateAffiliateUser.claimable,
+      'affiliate should have 5%',
     )
   })
 })

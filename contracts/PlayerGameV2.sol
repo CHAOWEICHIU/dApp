@@ -78,7 +78,7 @@ contract PlayerBookV2 {
         uint256 affiliationPortionAmount = depositAmount.div(100);
         uint256 playerId = uIdWallet_[wallet];
         uint256 affiliatePlayerId = user_[playerId].affiliateId;
-        uint256 affiliateAffiliatePlayerId = user_[uIdWallet_[wallet]].affiliateId;
+        uint256 affiliateAffiliatePlayerId = user_[affiliatePlayerId].affiliateId;
         
         /*
           10% -> direct affiliate
