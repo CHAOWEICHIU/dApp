@@ -2,6 +2,8 @@ import React from 'react'
 import styled from 'styled-components'
 import PropTypes from 'prop-types'
 import { Query } from 'react-apollo'
+import random from 'lodash/random'
+import MushroomScore from '../../components/MushroomScore'
 import Loader from '../../components/Loader'
 import withPolling from '../../lib/withPolling'
 import { MUSHROOM_GAME } from '../../lib/queries'
@@ -69,99 +71,56 @@ class MushroomHomePage extends React.PureComponent {
     }
   }
 
-  componentDidMount() {
-    const {
-      apolloClient: {
-        watchQuery,
-      },
-    } = this.props
+  constructor(props) {
+    super(props)
+    this.state = {
+      count: 0,
+    }
+  }
 
-    this.pollingGame = watchQuery({
-      query: MUSHROOM_GAME,
-      variables: { address: '0x35Ec829835aa5CEe0654287ACbDF33e8cea7BEDA'},
-      pollInterval: 1000,
-      ssr: false,
-    }).subscribe()
+  componentDidMount() {
+    this.time = setInterval(() => {
+      const { count } = this.state
+      this.setState({ count: count + random(0, 10) })
+    }, 300)
   }
 
   componentWillUnmount() {
-    if (this.pollingGame) {
-      this.pollingGame.unsubscribe()
+    if (this.time) {
+      clearInterval(this.time)
     }
   }
 
   render() {
     const {
       params,
-      walletAddress,
     } = this.props
+
+    const {
+      count,
+    } = this.state
+    
     return (
       <Layout mushroom>
         <Header mushroom />
           <MushroomHeader pathname={params.url} />
-          <Query
+          <MushroomScore count={count} />
+          {/* <Query
             query={MUSHROOM_GAME}
             variables={{ address: '0x35Ec829835aa5CEe0654287ACbDF33e8cea7BEDA' }}
           >
             {({ data, loading }) => {
-              if (!data || loading) return (
-                <Loader mushroom />
-              )
+              // if (!data || loading) return (
+                //<Loader mushroom />
+              //)
 
-              const {
-                mushroom: {
-                  userInfo: {
-                    balanceGu,
-                    balanceEth,
-                    game: {
-                      status,
-                      teams,
-                    },
-                  },
-                },
-              } = data
-              if (status !== 'started') {
-                return <Loader mushroom />
-              }
-              
               return (
                 <React.Fragment>
-                  <BoxContainer>
-                    {teams.map((team, i) => (
-                      <React.Fragment>
-                        <Center>
-                          {
-                            i === 0
-                              ? <Img src="/static/square-aunt.png" />
-                              : <Img src="/static/square-grandama.png" />
-                          }
-                        </Center>
-                        <Box key={team.id}>
-                          <Section>
-                            <Coin src="/static/mushroom-gugu-coin.png" />
-                            <Center>
-                              <ScoreText>
-                                {team.score}
-                                {'     '}
-                                Gu
-                              </ScoreText>
-                            </Center>
-                          </Section>
-                          {/* <Item>
-                            {team.players.map(player => (
-                              <AddressText key={player.address}>
-                                {player.address}
-                              </AddressText>
-                            ))}
-                          </Item> */}
-                        </Box>
-                      </React.Fragment>
-                    ))}
-                  </BoxContainer>
+                  
                 </React.Fragment>
               )
             }}
-          </Query>
+          </Query> */}
       </Layout>
     )
   }
