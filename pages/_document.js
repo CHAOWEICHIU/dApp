@@ -18,7 +18,10 @@ export default class MyDocument extends Document {
     return (
       <html>
         <Head>
-          <style>{'body { margin: 0 }'}</style>
+          <style>{`body {
+            margin: 0;
+            font-family: monospace;
+          }`}</style>
           {this.props.styleTags}
         </Head>
         <body>

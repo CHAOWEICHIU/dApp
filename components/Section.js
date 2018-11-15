@@ -48,11 +48,18 @@ export const SectionContent = styled.div`
 `
 
 export const SectionWrapper = styled.div`
-  padding: 30px;
+  margin: 30px; 
   display: flex;
-  width: 100%;
+  width: calc(100% - 60px);
   justify-content: center;
   flex-wrap: wrap;
+`
+
+export const SectionImgWrapper = styled.div`
+  display:flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 `
 
 const Section = ({
